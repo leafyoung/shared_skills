@@ -1,7 +1,7 @@
 ---
 name: agent-design-for-batch
 description: This skill should be used when the user asks to "write a batch script with the pi SDK", "design a pi agent pipeline", "run parallel pi sessions", "batch process files with pi", "architect a pi agent workflow", "handle stall detection in pi sessions", "implement graceful shutdown for pi", "design a parallel prompt architecture", "use pi SDK for bulk processing", "create a pi agent worker pool", "structure pi agent code", or mentions pi agent patterns, parallel pi agents, pi SDK batch processing, or pi agent architecture. Use this skill whenever designing or implementing code that creates and manages multiple pi AgentSession instances programmatically, including batch processing, worker pools, and automated pipelines.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Agent Design for Batch Processing
@@ -215,8 +215,20 @@ Attach a subscription to each session that logs events and resets the stall time
 | --------------------------------------------- | ------------------------------------------------ |
 | `auto_retry_start` / `auto_retry_end`         | Track SDK retries; on exhaustion, set error flag |
 | `tool_execution_start` / `tool_execution_end` | Log truncated args/errors/results                |
-| `message_end` (assistant)                     | If empty with no tool calls → set error flag     |
+| `message_end` (assistant)                     | If empty with no tool calls AND auto-retries occurred → set error flag |
 | Any event                                     | Reset `lastActivity` timestamp                   |
+
+### ⚠️ Multi-turn false-positive trap
+
+When a single session runs multiple prompts (e.g., validation → prompt 1 → transcript), the SDK emits `message_end` events between turns that can have empty content with no tool calls. **These are normal bookkeeping events, not errors.**
+
+A naive subscription logger flags *every* empty `message_end` as a 403/429 error. If an earlier turn's bookkeeping event sets the error flag, a later prompt that completed successfully (e.g., after 212 seconds) will trigger a false-positive fatal exit.
+
+**Fix**: Only flag empty `message_end` as an error when auto-retries also occurred — that combination reliably indicates an API quota error. Isolated empty responses without retries are SDK bookkeeping.
+
+**Fix**: Use duration-aware triage when checking the subscription error after a prompt resolves. If `prompt()` resolved without throwing and the prompt took a healthy amount of time (≥30 seconds), the session genuinely succeeded — log a warning instead of fatal-exiting. Real 403/429 errors fail in seconds, not minutes.
+
+See **`references/batch-patterns.md` → Subscription error triage** for the complete pattern.
 
 ### Error triage in catch blocks
 
@@ -269,6 +281,31 @@ WantedBy=timers.target
 ```
 
 Enable with `systemctl --user enable --now pi-cleanup-tmp.timer`.
+
+## Multi-turn session error handling
+
+When a session runs multiple prompts sequentially (validation → correction → post-processing), errors detected via subscription events must be triaged carefully:
+
+1. **Auto-retry correlation**: Only treat empty assistant responses as API errors when `auto_retry_start`/`auto_retry_end` events preceded them. SDK bookkeeping between turns produces empty `message_end` events that are benign.
+
+2. **Duration-aware triage**: After a `prompt()` call resolves successfully, check how long it took. If it ran for a healthy duration (e.g., ≥30 seconds), the prompt almost certainly succeeded — even if a subscription error flag was set by an earlier turn's bookkeeping event. Real quota/rate-limit errors cause fast failures, not minutes-long successful runs.
+
+3. **Reset error flags per prompt**: If the duration check passes, clear the subscription error flag so that downstream post-processing does not re-trigger the fatal exit.
+
+```typescript
+subscriptionError = sub.subscriptionError();
+if (subscriptionError) {
+  if (duration >= PROMPT_MIN_HEALTHY_DURATION_MS) {
+    log(`${num} ⚠️ Subscription error detected but prompt ran ${duration}ms — treating as non-fatal`);
+    subscriptionError = null; // clear for downstream
+  } else {
+    // Fast completion + subscription error → genuine API failure
+    session.dispose();
+    aborted.value = true;
+    await fatalRateLimit(subscriptionError, "prompt subscription");
+  }
+}
+```
 
 ## Additional Resources
 

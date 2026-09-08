@@ -84,6 +84,7 @@ function attachSubscriptionLogger(
 ): { subscriptionError: { value: unknown | null }; clearTimer: () => void } {
   const subscriptionError = { value: null as unknown | null };
   let lastActivity = Date.now();
+  let autoRetryCount = 0;
   let stallTimer: NodeJS.Timeout | null = null;
 
   function resetStallTimer() {
@@ -98,8 +99,11 @@ function attachSubscriptionLogger(
   session.subscribe((event) => {
     resetStallTimer();
     switch (event.type) {
+      case 'auto_retry_start':
+        autoRetryCount++;
+        break;
       case 'auto_retry_end':
-        if (event.exhausted) subscriptionError.value = new Error('Auto-retry exhausted');
+        if (autoRetryCount > 0) subscriptionError.value = new Error('Auto-retry exhausted');
         break;
       case 'tool_execution_start':
         log(`  Tool: ${event.toolName}`);
@@ -111,8 +115,9 @@ function attachSubscriptionLogger(
         if (event.role === 'assistant') {
           const text = event.message?.content?.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('') || '';
           const hasToolCalls = event.message?.content?.some((c: any) => c.type === 'tool_use');
-          if (!text && !hasToolCalls) {
-            subscriptionError.value = new Error('Empty assistant response');
+          // Only flag as error when preceded by auto-retries (SDK bookkeeping produces empty events between turns)
+          if (!text && !hasToolCalls && autoRetryCount > 0) {
+            subscriptionError.value = new Error('Empty response after auto-retries');
           }
         }
         break;
@@ -449,92 +454,119 @@ When `additionalExtensionPaths` is non-empty and `noExtensions: true`, only thos
 
 ## Subscription Logger Recipe
 
+The subscription logger must distinguish between real API errors and SDK bookkeeping. In multi-turn sessions (multiple `prompt()` calls), the SDK emits `message_end` events with empty content between turns — these are normal, not errors.
+
+### Tracking auto-retries
+
+Use a counter to track auto-retries. Only flag an empty response as an error when auto-retries occurred:
+
 ```typescript
 function attachSubscriptionLogger(
   session: AgentSession,
   onStall: () => void,
 ): {
-  subscriptionError: { value: unknown | null };
+  subscriptionError: () => string | null;
   clearTimer: () => void;
-  activityTimestamp: { value: number };
 } {
-  const subscriptionError = { value: null as unknown | null };
-  const activityTimestamp = { value: Date.now() };
+  let subscriptionError: string | null = null;
+  let autoRetryCount = 0;
+  let lastActivity = Date.now();
   let stallTimer: NodeJS.Timeout | null = null;
 
   function resetTimer() {
-    activityTimestamp.value = Date.now();
+    lastActivity = Date.now();
     if (stallTimer) clearTimeout(stallTimer);
     stallTimer = setTimeout(onStall, STALL_TIMEOUT_MS);
   }
   resetTimer();
 
   session.subscribe((event) => {
-    resetTimer();
+    lastActivity = Date.now();
+    // Re-arm stall timer on every event
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(onStall, STALL_TIMEOUT_MS);
 
     switch (event.type) {
       case 'auto_retry_start':
-        log(`  [retry] Attempt ${event.attempt}/${event.maxAttempts}`);
+        autoRetryCount++;
+        log(`  [retry] Attempt ${autoRetryCount}`);
         break;
       case 'auto_retry_end':
-        if (event.exhausted) {
-          subscriptionError.value = new Error(
-            `Auto-retry exhausted after ${event.attempts} attempts`
-          );
+        if (autoRetryCount > 0) {
+          subscriptionError = `Auto-retry exhausted after ${autoRetryCount} attempts (likely 429 or 403)`;
         }
         break;
 
       case 'tool_execution_start':
-        log(`  Tool: ${event.toolName}(${JSON.stringify(event.args || {}).slice(0, 200)})`);
+        log(`  Tool: ${event.toolName}`);
         break;
       case 'tool_execution_end':
-        if (event.isError) {
-          log(`  Tool error: ${String(event.error || '').slice(0, 300)}`);
-        }
+        if (event.isError) log(`  Tool error: ${String(event.error || '').slice(0, 300)}`);
         break;
 
       case 'message_end':
-        if (event.role === 'assistant') {
+        if (event.message?.role === 'assistant') {
           const text = extractText(event.message);
           const toolCalls = extractToolCalls(event.message);
           if (!text && toolCalls.length === 0) {
-            subscriptionError.value = new Error('Empty assistant message');
-          } else if (text) {
-            log(`  Response: ${text.slice(0, 200)}${text.length > 200 ? '...' : ''}`);
-          }
-          if (toolCalls.length > 0) {
-            log(`  Tool calls: ${toolCalls.join(', ')}`);
+            // CRITICAL: Only flag as error when preceded by auto-retries.
+            // SDK bookkeeping between turns also produces empty message_end events.
+            if (autoRetryCount > 0) {
+              log(`  ⚠️ Empty response after ${autoRetryCount} auto-retries (likely API error)`);
+              subscriptionError = `Empty response after ${autoRetryCount} auto-retries — likely 403/429`;
+            } else {
+              log(`  ℹ️ Empty response (SDK bookkeeping, ignoring)`);
+            }
+          } else {
+            if (text) log(`  Response: ${text.slice(0, 200)}${text.length > 200 ? '...' : ''}`);
+            if (toolCalls.length > 0) log(`  Tool calls: ${toolCalls.join(', ')}`);
           }
         }
         break;
 
       case 'turn_end':
-        log(`  Turn complete (${event.toolResults?.length || 0} tool results)`);
+        log(`  Turn complete`);
         break;
       case 'agent_end':
-        log(`  Agent finished (${event.messages?.length || 0} new messages)`);
+        log(`  Agent finished`);
         break;
     }
   });
 
   return {
-    subscriptionError,
+    subscriptionError: () => subscriptionError,
     clearTimer: () => { if (stallTimer) clearTimeout(stallTimer); },
-    activityTimestamp,
   };
 }
+```
 
-function extractText(msg: any): string {
-  return (msg?.content || [])
-    .filter((c: any) => c.type === 'text')
-    .map((c: any) => c.text)
-    .join('');
-}
+### Subscription error triage after prompt resolution
 
-function extractToolCalls(msg: any): string[] {
-  return (msg?.content || [])
-    .filter((c: any) => c.type === 'tool_use')
-    .map((c: any) => c.name);
+After `prompt()` resolves, check the subscription error with duration-aware logic. A prompt that ran for a healthy duration and resolved without throwing almost certainly succeeded:
+
+```typescript
+// Minimum duration for a prompt to be considered genuinely successful.
+// Real 403/429 errors fail in seconds — not minutes.
+const PROMPT_MIN_HEALTHY_DURATION_MS = 30_000;
+
+// ...after prompt resolves:
+const duration = Date.now() - promptStart;
+log(`[${num}] Prompt completed in ${duration}ms`);
+
+subscriptionError = sub.subscriptionError();
+if (subscriptionError) {
+  // Duration-aware triage: long-running success overrides subscription flag
+  if (duration >= PROMPT_MIN_HEALTHY_DURATION_MS) {
+    log(`[${num}] ⚠️ Subscription error but prompt ran ${duration}ms — treating as non-fatal`);
+    log(`[${num}]    Error: ${subscriptionError}`);
+    subscriptionError = null; // clear so post-processing doesn't fatal
+  } else {
+    // Fast completion (< 30s) + subscription error → genuine API failure
+    clearTimer();
+    session.dispose();
+    aborted.value = true;
+    await fatalRateLimit(subscriptionError, "prompt subscription");
+  }
 }
 ```
 

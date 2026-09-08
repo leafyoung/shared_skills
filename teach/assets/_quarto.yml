@@ -1,0 +1,31 @@
+# Shared Quarto project config for the teaching workspace.
+# Every lesson and reference doc inherits this — one consistent look.
+# Render a lesson with: quarto render ./lessons/0001-....qmd
+# Requires the `quarto` CLI (https://quarto.org).
+# ponytail: minimal Tufte-inspired base, extend only when a lesson needs it.
+
+project:
+  type: default
+  render:
+    - "*.qmd"
+    - "lessons/**/*.qmd"
+    - "reference/**/*.qmd"
+
+lang: en
+
+format:
+  typst:
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    papersize: a4
+    margin:
+      x: 2.2cm
+      y: 2.4cm
+    fontsize: 11pt
+    mainfont: "New Computer Modern"
+    color: "#336699"
+
+execute:
+  echo: false
+  warning: false
