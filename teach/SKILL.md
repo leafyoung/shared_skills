@@ -99,13 +99,15 @@ Structure each concept in a lesson as a **node** in the dependency map, and teac
 
 Math renders as LaTeX in Quarto/Typst — write `$f(x) = x^2$`, never plain-text approximations. If LaTeX can be used, it should be.
 
-Diagrams: use the `mermaid-maker` subagent for relational diagrams (flowcharts, dependency graphs) and `svg-maker` for spatial/geometric figures (function plots, vectors, number lines, layouts) — embed the resulting PNG in the lesson.
+Diagrams: use the `mermaid-maker` subagent for relational diagrams (flowcharts, dependency graphs) and `svg-maker` for spatial/geometric figures (function plots, vectors, number lines, layouts) — embed the resulting PNG in the lesson. If neither subagent is available, hand-build the figure (raw SVG, or a small matplotlib/plotting script) — but never as a one-off: see [Assets](#assets) below, every figure's generation code is a first-class, saved component, not scratch work.
 
 ## Assets
 
 Lessons are built from reusable **components**, stored in `./assets/`: Typst template partials, reusable markdown includes, diagram helpers, code snippets — anything a second lesson could reuse.
 
 Reuse is the default, not the exception. Before authoring a lesson, read `./assets/` and build from the components already there. When a lesson needs something new and reusable, write it as a component in `./assets/` and reference it — never inline content a future lesson would duplicate.
+
+**Every figure is regenerable, not just embeddable.** When a lesson figure is produced by code (a hand-built SVG, a matplotlib/plotting script — anything that isn't a static export from `mermaid-maker`/`svg-maker`), save the generation script itself into `./assets/` alongside the rendered image, named to match (`lessonNNNN-topic.py` generating `lessonNNNN-topic.svg`/`.png`). The script must run standalone from the workspace root with a one-line invocation (document it in a short module docstring), and must regenerate the exact figure already embedded — a figure with no saved script is a dead end the moment a number in the lesson needs to change. This is why the image is a build artifact of the script, not the other way around: edit the script and re-run it, don't hand-patch the image.
 
 A shared `_quarto.yml` at the workspace root is the first component every workspace earns, bootstrapped from the template [`assets/_quarto.yml`](./assets/_quarto.yml). It sets the Typst `format` defaults — page, margins, fonts, accent colour — so every lesson renders as one consistent course rather than a pile of one-offs. As the workspace grows, so should the component library.
 
