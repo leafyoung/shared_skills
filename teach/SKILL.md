@@ -31,7 +31,7 @@ Facts feel arbitrary when there's no visible reason they *had* to be that way, a
 ## First session
 
 1. **Probe.** If no `MISSION.qmd` exists, interview the user on why they want to learn this (`ask_user_question`) — interrogate the goal until it's concrete. Write it before anything else. Also probe their current level: bracket the edge of what they know (see [Zone Of Proximal Development](#zone-of-proximal-development)).
-2. **Plan.** Scope the field from research, never from memory alone. Present the plan in chat before any teaching: the approach in prose, plus a small mermaid dependency map — unconditional truths at the roots, each node hanging off what it depends on, the user's goal as the sink. Stress-test the roots: if a "foundational" node itself derives from something simpler the user would accept at face value, push it down. Then stop and wait for the user's go-ahead before authoring. Search for high-trust sources (books, articles, courses, communities) and populate `RESOURCES.qmd`.
+2. **Plan.** Scope the field from research, never from memory alone. Present the plan in chat before any teaching: the approach in prose, plus a small mermaid dependency map — unconditional truths at the roots, each node hanging off what it depends on, the user's goal as the sink. Stress-test the roots: if a "foundational" node itself derives from something simpler the user would accept at face value, push it down. Then stop and wait for the user's go-ahead before authoring. Search for high-trust sources (books, articles, courses, communities) and populate `RESOURCES.qmd`. Every entry is downloaded on the spot (see [Knowledge](#knowledge) — Acquisition): a `RESOURCES.qmd` entry without a local copy or an explicit streaming-only/paywalled note is not fully acquired.
 3. **Build one lesson.** Create a single self-contained Quarto lesson in `./lessons/0001-...qmd` (rendered to PDF via Typst) tied to the mission. Ensure the workspace has a `_quarto.yml` at its root, bootstrapped from the template [`assets/_quarto.yml`](./assets/_quarto.yml) — this is the shared styling every lesson inherits.
 4. **Record.** Write a learning record if the user demonstrated understanding or disclosed prior knowledge.
 
@@ -146,7 +146,16 @@ Knowledge should first be gathered from trusted resources. Use `RESOURCES.qmd` t
 
 If web search does not work (errors, timeouts, empty, or spam results), **notify the user immediately** — do not silently fall back to parametric knowledge or pretend sources were verified. State what failed, mark affected resources as unverified in `RESOURCES.qmd`, and retry when search is available again.
 
-When a resource is verified and cited, **download it directly and save it into the workspace** (e.g. a `resources/` folder — PDFs, docs pages, spec snapshots) and record the local path in `RESOURCES.qmd`. Lessons must not depend on external links staying alive.
+### Acquisition: download every resource, immediately
+
+Every resource added to `RESOURCES.qmd` is **downloaded into the workspace at the moment it is added** — all of them, not only the ones the current lesson cites. `RESOURCES.qmd` is an acquisition ledger, not a bookmark list: an entry without a local copy is unfinished. Record the local path in `RESOURCES.qmd`. Lessons must not depend on external links staying alive:
+
+- **PDFs, datasets, slides, code archives** — save verbatim into `resources/`.
+- **Web pages** — snapshot to a local `.qmd` under `resources/web/`: a YAML `title`, a provenance blockquote (source URL, fetch date, license/© note), then the page's content converted to markdown. Trim site navigation, keep the substance.
+- **Paywalled or unobtainable full texts** — say so plainly in `RESOURCES.qmd`; snapshot the abstract/landing page as a `.qmd`, and hunt an open-access substitute (author mirrors, `.edu` lecture notes, working-paper repositories, the Wayback Machine) rather than relying on the dead link.
+- **Streaming or interactive media** (video lectures, courses, forums) — don't mass-download video; snapshot the landing page as a `.qmd` under `resources/web/`, mark the entry *streaming-only* in `RESOURCES.qmd`, and note the offline substitute where one exists (e.g. the same course's textbook as a PDF).
+
+Before finishing any session that touched `RESOURCES.qmd`, re-scan it: every entry carries a local path or an explicit streaming-only/paywalled note. Fix the gaps while you're still in the session.
 
 For acquiring knowledge, difficulty is the enemy. It eats working memory you need for understanding.
 
@@ -160,6 +169,10 @@ For skill acquisition, difficulty is the tool. Effortful retrieval is what build
 - **Real-world tasks** the lesson walks the user through step by step (for instance, yoga poses, or running a command and observing the output).
 
 Each of these should be based on a **feedback loop**. Because Typst output is a static PDF, automatic feedback is not possible — so make the loop tight another way: print the answers (or a marking rubric) under a clearly delimited "Answers" heading at the end of the lesson, and always invite the user to bring their attempt back to the agent for review. The agent is the feedback channel.
+
+**Answers are not optional.** Every exercise printed in a lesson — multiple-choice, fill-in-the-blank, short prompt, real-world task — must have its answer or expected outcome (rubric) printed in the same lesson file, under the "Answers" heading. A lesson rendered with an unanswered exercise is incomplete and must not ship. (2026-09-15: lesson 0001 shipped with unanswered Skills questions and the user had to ask for the key — the exact failure mode this rule prevents.)
+
+**Notebook preference:** the user prefers **marimo** notebooks over Jupyter for lesson-created notebooks and exercises (reactive cells, no hidden state, stored as plain Python — see marimo.new). In an existing Jupyter-based workspace, engage with its notebooks as they are — don't convert wholesale unless asked.
 
 For printed multiple-choice questions (and in-chat options), construct the set so evenness is automatic — don't audit after the fact:
 
