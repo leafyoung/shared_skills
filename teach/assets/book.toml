@@ -1,0 +1,46 @@
+# mdBook build config template — copy to <workspace>/mdbook/book.toml, fill in the title.
+# Wire plugins from INSIDE the book dir: cd mdbook && mdbook-admonish install .
+# (add `mdbook-mermaid install .` only once a mermaid block exists — it edits this file too)
+# Exact toolchain: mdbook 0.4.52 + mdbook-admonish 1.20.0 + mdbook-katex 0.9.0 + mdbook-mermaid 0.16.0
+# (see MDBOOK.md — these are mutually compatible; do not mix versions).
+#
+# katex_underscore_fix.py: proven implementation lives at
+#   katex_text_fix.py
+# Copy it next to the book (or keep the absolute path) — it must exit 0 on
+# `supports html` probes or mdbook silently skips it. See MDBOOK.md gotchas.
+
+[book]
+title = "TODO — course title"
+authors = []
+src = "src"
+language = "en"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.1.0" # do not edit: managed by `mdbook-admonish install`
+
+[preprocessor.katex]
+# must run after admonish: admonish turns callout fences into HTML first,
+# otherwise mdbook-katex skips math inside them as code blocks
+after = ["admonish"]
+
+# escapes _ and * in KaTeX html text nodes: katex emits raw span runs that
+# pulldown parses as paragraph text, where rendered underscores pair into
+# emphasis across span boundaries ("unclosed <span>" warnings)
+[preprocessor.katex-text-fix]
+command = "python3 katex_text_fix.py"
+after = ["katex"]
+
+# uncomment when the course gains its first mermaid diagram,
+# then run: cd mdbook && mdbook-mermaid install .
+# [preprocessor.mermaid]
+# command = "mdbook-mermaid"
+
+[output.html]
+default-theme = "light"
+additional-css = ["./mdbook-admonish.css"]
+# additional-js = ["mermaid.min.js", "mermaid-init.js"]  # added by mdbook-mermaid install
