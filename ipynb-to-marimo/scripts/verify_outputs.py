@@ -127,9 +127,13 @@ def marimo_text(path: Path, cwd: Path, env: dict[str, str]) -> str:
     saved_env = {k: os.environ.get(k) for k in env}
     os.environ.update(env)
     buf = io.StringIO()
+    path_added = str(cwd) not in sys.path
     try:
         os.chdir(cwd)
-        name = f"_verify_{re.sub(r'\\W', '_', path.stem)}"
+        if path_added:
+            sys.path.insert(0, str(cwd))
+        _safe_stem = re.sub(r"\W", "_", path.stem)
+        name = f"_verify_{_safe_stem}"
         spec = importlib.util.spec_from_file_location(name, path)
         module = importlib.util.module_from_spec(spec)
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
@@ -137,6 +141,11 @@ def marimo_text(path: Path, cwd: Path, env: dict[str, str]) -> str:
             module.app.run()  # exceptions propagate to the caller
     finally:
         os.chdir(prev_cwd)
+        if path_added:
+            try:
+                sys.path.remove(str(cwd))
+            except ValueError:
+                pass
         for k, v in saved_env.items():
             if v is None:
                 os.environ.pop(k, None)

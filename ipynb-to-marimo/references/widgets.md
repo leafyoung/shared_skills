@@ -2,6 +2,18 @@
 
 Jupyter uses **ipywidgets** with imperative callbacks (`observe`, `link`, `jslink`). marimo uses **reactive cells** — a widget's `.value` automatically triggers downstream cells when it changes, so most callback/linking patterns become unnecessary.
 
+**This migration is mandatory, not optional, and failing to do it produces no error.**
+`ipywidgets` is a plain importable package, so a converted cell that builds an `Accordion`,
+`Tab`, `Output`, or calls `interact()`/`.observe()` runs to completion under marimo — `marimo
+check`, the structural/chain verification layers, and a real headless `app.run()` will all pass.
+What actually happens at runtime: the widget object is constructed with no Comm channel to
+marimo's frontend, so it renders as an inert text repr (e.g.
+`interactive(children=(Dropdown(...), Output()), _dom_classes=('widget-interact',))`) instead of
+an interactive control, and every `.observe()`/`interact()` callback is simply never invoked.
+The notebook looks converted and verified while its entire interactive surface is dead. Grep the
+source for `ipywidgets`/`from ipywidgets import` before calling a conversion done, and migrate
+every hit using the table below.
+
 ## Widget mapping
 
 | ipywidget | marimo | Notes |

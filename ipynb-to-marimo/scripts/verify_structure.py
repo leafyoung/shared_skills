@@ -28,6 +28,22 @@ def shallow_dump(node):
     return ast.dump(n)
 
 
+class AugExpand(ast.NodeTransformer):
+    """x += y  ->  x = x + y (converter emits the expanded form), for any
+    assignable target -- Name, Subscript (`y[i] -= v`), or Attribute."""
+
+    def visit_AugAssign(self, node):
+        if isinstance(node.target, (ast.Name, ast.Subscript, ast.Attribute)):
+            load_target = copy.deepcopy(node.target)
+            load_target.ctx = ast.Load()
+            store_target = copy.deepcopy(node.target)
+            store_target.ctx = ast.Store()
+            binop = ast.BinOp(left=load_target, op=node.op, right=node.value)
+            new = ast.Assign(targets=[store_target], value=binop)
+            return ast.copy_location(new, node)
+        return self.generic_visit(node)
+
+
 def all_stmts(src):
     out = []
 
@@ -38,7 +54,20 @@ def all_stmts(src):
                 out.append({"norm": shallow_dump(child) if compound else ast.dump(child)})
                 walk(child)
 
-    walk(ast.parse(src))
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        stripped = "\n".join(
+            "#" + ln if ln.lstrip().startswith(("%", "!")) else ln
+            for ln in src.split("\n")
+        )
+        try:
+            tree = ast.parse(stripped)
+        except SyntaxError:
+            return out
+    tree = AugExpand().visit(tree)
+    ast.fix_missing_locations(tree)
+    walk(tree)
     return out
 
 
@@ -78,7 +107,17 @@ def marimo_content_stmts(py_path):
     tree = ast.parse(src)
     cells = [n for n in tree.body if isinstance(n, ast.FunctionDef) and any(
         getattr(d, "attr", "") == "cell" for d in n.decorator_list)]
+    # `@app.function`: marimo hoists a def with no cross-cell free-variable
+    # deps out of the reactive graph. It has no marimo-added trailing
+    # `return (...)` tuple -- the whole def IS the cell's one statement,
+    # same as the original notebook cell it came from.
+    funcs = [n for n in tree.body if isinstance(n, ast.FunctionDef) and any(
+        getattr(d, "attr", "") == "function" for d in n.decorator_list)]
     content, n_content = [], 0
+    for node in funcs:
+        n_content += 1
+        func_src = "\n".join(lines[node.lineno - 1:node.end_lineno])
+        content.extend(all_stmts(func_src))
     for node in cells:
         if not isinstance(node.body[-1], ast.Return):
             continue

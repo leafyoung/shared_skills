@@ -36,6 +36,7 @@ bugs in the conversion.
 """
 import argparse
 import ast
+import copy
 import difflib
 import json
 import sys
@@ -315,14 +316,20 @@ def dump_val(v, cc):
 
 
 class AugExpand(ast.NodeTransformer):
-    """x += y  ->  x = x + y (converter emits the expanded form)."""
+    """x += y  ->  x = x + y (converter emits the expanded form).
+
+    Handles any assignable target -- Name, Subscript (`y[i] -= v`), or
+    Attribute (`obj.attr += v`) -- not just plain names.
+    """
 
     def visit_AugAssign(self, node):
-        if isinstance(node.target, ast.Name):
-            binop = ast.BinOp(left=ast.Name(id=node.target.id, ctx=ast.Load()),
-                              op=node.op, right=node.value)
-            new = ast.Assign(targets=[ast.Name(id=node.target.id, ctx=ast.Store())],
-                             value=binop)
+        if isinstance(node.target, (ast.Name, ast.Subscript, ast.Attribute)):
+            load_target = copy.deepcopy(node.target)
+            load_target.ctx = ast.Load()
+            store_target = copy.deepcopy(node.target)
+            store_target.ctx = ast.Store()
+            binop = ast.BinOp(left=load_target, op=node.op, right=node.value)
+            new = ast.Assign(targets=[store_target], value=binop)
             return ast.copy_location(new, node)
         return self.generic_visit(node)
 
@@ -383,8 +390,24 @@ def marimo_cells(path):
     lines = src.splitlines(keepends=True)
     fns = [n for n in tree.body if isinstance(n, ast.FunctionDef) and any(
         getattr(d, "attr", "") == "cell" for d in n.decorator_list)]
+    # `@app.function`: marimo hoists a def with no cross-cell free-variable
+    # deps out of the reactive graph. The whole def is real user code, 1:1
+    # with its original notebook cell (no `def _(...): ... return` wrapper).
+    funcs = [n for n in tree.body if isinstance(n, ast.FunctionDef) and any(
+        getattr(d, "attr", "") == "function" for d in n.decorator_list)]
+    nodes = sorted([(n, "cell") for n in fns] + [(n, "function") for n in funcs],
+                   key=lambda t: t[0].lineno)
     bodies, params = [], []
-    for fn in fns:
+    for fn, kind in nodes:
+        if kind == "function":
+            block = lines[fn.lineno - 1:fn.end_lineno]
+            bodies.append("".join(block))
+            params.append([])
+            continue
+        body_stmts = [s for s in fn.body if not isinstance(s, ast.Return)]
+        if (len(body_stmts) == 1 and isinstance(body_stmts[0], ast.Import)
+                and all(a.name == "marimo" for a in body_stmts[0].names)):
+            continue  # converter's boilerplate `import marimo as mo` cell; has no ipynb counterpart
         a = fn.args
         plist = [p.arg for p in a.args + a.kwonlyargs + a.posonlyargs]
         if a.vararg:

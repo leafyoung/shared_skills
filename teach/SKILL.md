@@ -120,6 +120,8 @@ Reuse is the default, not the exception. Before authoring a lesson, read `./asse
 
 A shared `_quarto.yml` at the workspace root is the first component every Quarto workspace earns, bootstrapped from the template [`assets/_quarto.yml`](./assets/_quarto.yml). It sets the Typst `format` defaults — page, margins, fonts, accent colour — so every lesson renders as one consistent course rather than a pile of one-offs. mdBook workspaces earn the equivalent: [`assets/book.toml`](./assets/book.toml) (callouts, KaTeX math and the text-fix preprocessor pre-wired — see [MDBOOK.md](./MDBOOK.md)). As the workspace grows, so should the component library.
 
+Figure scripts earn the same treatment: bootstrap `assets/scripts/svgutil.py` from [`assets/scripts/svgutil.py`](./assets/scripts/svgutil.py) into any workspace that hand-builds SVG figures, rather than re-typing `line`/`rect`/`text`/`circle`/`polyline`/`write_svg` tag-formatting per script. It includes `FONT_EN`/`FONT_ZH` and `lang_from_argv()` for a script that renders both an English and a Chinese label variant from one file (`python3 scriptname.py zh`). Copy it in once per workspace (not a cross-project import) so each course stays self-contained.
+
 ## The Mission
 
 Every lesson should be tied into the mission - the reason that the user is interested in learning about the topic.

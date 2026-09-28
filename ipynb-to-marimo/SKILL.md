@@ -1,12 +1,20 @@
 ---
 name: ipynb-to-marimo
-description: Convert Jupyter notebooks (.ipynb) to marimo notebooks (.py) and verify the conversion end-to-end. Use when asked to convert notebooks to marimo, when "move off Jupyter" or "marimo conversion" comes up, when a converted file raises NameError or has scattered comments or duplicate definitions, when deciding whether magic commands like %timeit or %%timeit survive conversion, when a converted cell takes its inputs as function parameters or variable names gained _1/_2 suffixes or _ prefixes (converter versioning/privatization), when deciding whether df['col']=... cross-cell mutation or repeated imports are legal in marimo, when a for-loop variable (for name, data in ...) raises MultipleDefinitionError, when a statsmodels/arch summary shows the wrong Dep. Variable after conversion, when comparing two runs of notebooks that download live data (pin the data source), when a converted notebook's fit produces plausible but wrong numbers because an objective function closed over a global that a later cell rebinds (late-binding stale-data trap), when bare display() raises NameError after conversion, when choosing between env-driven flags and app.run(defs=) overrides, when an output diff is dominated by renderer noise (figure reprs, keras progress bars or box tables, pandas preview furniture, warning continuations, self-enumerated file listings) or by unseeded stochastic runs (skeleton comparison), or when verifying a conversion is faithful before deleting the originals. Covers uv project setup (ruff per-file-ignores, VS Code editor associations), magic-command handling, what marimo convert rewrites internally, and four-layer verification (AST structural, def-chain/version correctness incl. runtime private-name traps, behavioral metrics incl. a normalized-output diff harness with skeleton fallback and replay-pinned live data, end-to-end execution).
+description: Convert Jupyter notebooks (.ipynb) to marimo notebooks (.py) in a uv + pyproject.toml project, and verify the conversion end-to-end before deleting the originals. Use when asked to convert notebooks to marimo or "move off Jupyter", when a converted file raises NameError/UnboundLocalError, has scattered comments or duplicate definitions, or produces plausible-but-wrong numbers after conversion, or when judging whether a converter rewrite (private-name prefixes, version suffixes, magic commands, display() calls, MultipleDefinitionError) is safe. Covers uv project setup (ruff per-file-ignores, VS Code editor associations), magic-command handling, what marimo convert rewrites internally, and four-layer verification (AST structural, def-chain/version correctness, behavioral output diffing, end-to-end execution).
 ---
 
 # Converting Jupyter Notebooks to Marimo
 
 Convert, restore, verify, then clean up the project. **Do not delete the original
 `.ipynb` until all four verification layers pass.**
+
+**Precondition: this skill assumes a `uv` + `pyproject.toml` project.** Every
+command below is `uv run` / `uv add` against a project-local `.venv`. Check
+first — `test -f pyproject.toml && command -v uv`. If either is missing, stop
+and tell the user the project isn't uv-managed rather than improvising pip,
+poetry, or conda equivalents; those need different dependency, script-running,
+and environment-activation commands throughout, not just a substituted install
+line.
 
 ## 1. Convert first
 
@@ -168,6 +176,17 @@ before bulk tooling touches converted files.
 
 ## 5. Verify end-to-end (all four layers)
 
+**Run every verification command via `uv run` from inside the target project
+directory, never an ad hoc environment.** Layers 2 and 3 `importlib`-load and
+execute the converted app for real, so they need the project's own runtime
+dependencies (marimo, numpy, pandas, whatever the notebook imports) already
+installed by `uv add`/`uv sync` in §2. Running them elsewhere fails with an
+unrelated `ModuleNotFoundError` that looks like a conversion bug but isn't —
+confirmed by hand: `uv run --with nbformat --with numpy python verify_outputs.py`
+raised `ModuleNotFoundError: No module named 'marimo'` on a valid conversion,
+while the identical command with `--with marimo` (or, better, just `uv run
+python ...` inside the already-set-up project) passed.
+
 **Layer 1 — structural equivalence.** Every original statement must exist in the
 conversion, in order, rename-tolerant:
 
@@ -289,7 +308,20 @@ Details, edge cases, and the removal protocol: read
 - Replace interactive input that waits for terminal input; gate expensive work or
   side effects with `mo.stop()` and a suitable UI element.
 - Do not print, log, or save secrets.
-- For ipywidgets, read [`references/widgets.md`](references/widgets.md).
+- **ipywidgets do not work in marimo — this is silent, not an error.** `import ipywidgets`
+  succeeds (it's an ordinary pip package) and `Accordion`/`Tab`/`Output`/`interact`/`.observe()`
+  all construct and execute without raising, so `marimo check`, Layers 1-4, and even a real
+  headless `app.run()` all report success. But marimo's frontend has no Comm channel wired up
+  for classic ipywidgets: containers print as inert text reprs
+  (`interactive(children=(Dropdown(...), Output()), _dom_classes=(...))`) instead of rendering,
+  and `.observe()`/`interact()` callbacks never fire — the "interactivity" is completely dead.
+  None of the automated verification layers catch this because they check that code runs and
+  outputs match, not that a widget is interactive. Treat any `import ipywidgets` (or
+  `from ipywidgets import ...`) in the source as a required migration, not an optional cleanup:
+  grep for it before declaring a notebook done, and read
+  [`references/widgets.md`](references/widgets.md) for the mapping (prefer the native `mo.ui`/
+  `mo.accordion`/`mo.ui.tabs` equivalent in the table there; fall back to
+  `mo.ui.anywidget(...)` only for entries marked "no equivalent").
 - For LaTeX and MathJax, read [`references/latex.md`](references/latex.md).
 
 ## 7. Clean up
@@ -299,12 +331,15 @@ the `.ipynb` files, and update README/AGENTS-style docs (runtime commands move f
 nbconvert to `uv run marimo export html`; editor associations now resolve). Then:
 
 ```bash
-grep -rn "ipynb" --include="*.md" --include="*.qmd" --include="*.toml" --include="*.yml" --include="*.py" . \
-  | grep -v ".venv"    # stale filename references in lessons/prose/helper scripts dangle after deletion
+grep -rn "ipynb" --include="*.md" --include="*.qmd" --include="*.toml" --include="*.yml" \
+  --include="*.yaml" --include="*.py" --include="*.sh" --include="Dockerfile" \
+  --include="Makefile" . | grep -v ".venv"    # stale filename references in lessons/prose/helper scripts/CI dangle after deletion
 ```
 
-Also sweep for the old runner by name (helper scripts and lesson prose may
+Also sweep for the old runner by name (helper scripts, CI, and lesson prose may
 invoke it by filename: `grep -rn "run_notebooks\|nbconvert" --include="*.py"
---include="*.md" . | grep -v .venv`) and drop the orphaned Jupyter dev
-dependencies (`uv remove --group dev jupyterlab ipykernel nbconvert`). Full protocol:
+--include="*.md" --include="*.sh" --include="*.yml" --include="*.yaml"
+--include="Dockerfile" --include="Makefile" . | grep -v .venv`) and drop the
+orphaned Jupyter dev dependencies (`uv remove --group dev jupyterlab ipykernel
+nbconvert`). Full protocol:
 [`references/verification.md`](references/verification.md), "Removal protocol".

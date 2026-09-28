@@ -1,13 +1,18 @@
 # mdBook build config template — copy to <workspace>/mdbook/book.toml, fill in the title.
 # Wire plugins from INSIDE the book dir: cd mdbook && mdbook-admonish install .
 # (add `mdbook-mermaid install .` only once a mermaid block exists — it edits this file too)
-# Exact toolchain: mdbook 0.4.52 + mdbook-admonish 1.20.0 + mdbook-katex 0.9.0 + mdbook-mermaid 0.16.0
-# (see MDBOOK.md — these are mutually compatible; do not mix versions).
+# Toolchain: mdbook 0.5.x + mdbook-katex (crates.io, >=0.10) + mdbook-mermaid from crates.io;
+# mdbook-admonish must be built from the tixena/mdbook-admonish git fork
+# (crates.io 1.20.0 predates mdbook 0.5 and crashes on it) — see MDBOOK.md.
 #
-# katex_underscore_fix.py: proven implementation lives at
-#   katex_text_fix.py
-# Copy it next to the book (or keep the absolute path) — it must exit 0 on
-# `supports html` probes or mdbook silently skips it. See MDBOOK.md gotchas.
+# katex_text_fix.py: copy assets/scripts/katex_text_fix.py from the teach skill
+# next to the book. It must exit 0 on `supports <renderer>` probes (it does)
+# and MUST keep `after = ["katex"]` — mdbook otherwise sorts preprocessors
+# alphabetically and runs it before katex, where it is a no-op.
+#
+# If a course uses no admonish callouts and no mermaid, the minimal wiring is
+# katex + katex-text-fix only (drop the admonish block and the additional-css
+# reference to mdbook-admonish.css).
 
 [book]
 title = "TODO — course title"
@@ -25,7 +30,9 @@ assets_version = "3.1.0" # do not edit: managed by `mdbook-admonish install`
 
 [preprocessor.katex]
 # must run after admonish: admonish turns callout fences into HTML first,
-# otherwise mdbook-katex skips math inside them as code blocks
+# otherwise mdbook-katex skips math inside them as code blocks.
+# Add `no-css = true` if you vendor katex.min.css + fonts yourself
+# (offline math — see MDBOOK.md gotchas) instead of the default CDN <link>.
 after = ["admonish"]
 
 # escapes _ and * in KaTeX html text nodes: katex emits raw span runs that

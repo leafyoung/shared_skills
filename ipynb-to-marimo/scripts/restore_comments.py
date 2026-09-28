@@ -50,7 +50,21 @@ def all_stmts(src):
                             "norm": shallow_dump(child) if compound else ast.dump(child)})
                 walk(child)
 
-    walk(ast.parse(src))
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        # Cell has IPython magic lines (e.g. "%matplotlib inline") mixed with
+        # real code; the converter drops the magics, so strip lines starting
+        # with %/! (comment out, to preserve line numbers) and retry.
+        stripped = "\n".join(
+            "#" + ln if ln.lstrip().startswith(("%", "!")) else ln
+            for ln in src.split("\n")
+        )
+        try:
+            tree = ast.parse(stripped)
+        except SyntaxError:
+            return out
+    walk(tree)
     return out
 
 
@@ -162,17 +176,24 @@ def align(norm_o, norm_p, report):
     return mapping
 
 
-def process_cell(py_body, orig_src, report):
-    body = dedent4(py_body)
+def process_cell(py_body, orig_src, report, strip_return=True):
+    # `@app.function` bodies are top-level (0-indent `def`); `@app.cell`
+    # bodies are indented one level inside `def _(...):` and need dedenting.
+    body = dedent4(py_body) if strip_return else list(py_body)
     tree = ast.parse("\n".join(body))
     body_nodes = tree.body
-    ret_node = body_nodes[-1]
-    if not isinstance(ret_node, ast.Return):
-        return None
-    if is_noncontent_cell(body_nodes[:-1]) != "content":
-        return None
+    if strip_return:
+        ret_node = body_nodes[-1]
+        if not isinstance(ret_node, ast.Return):
+            return None
+        if is_noncontent_cell(body_nodes[:-1]) != "content":
+            return None
+        ret_start = ret_node.lineno
+    else:
+        # `@app.function`: the whole def is real user code, no marimo-added
+        # trailing `return (...)` tuple to strip.
+        ret_start = len(body) + 1
 
-    ret_start = ret_node.lineno
     code_lines = [l for i, l in enumerate(body, 1) if i < ret_start]
     py_stmts = all_stmts("\n".join(code_lines))
     orig_stmts = all_stmts(orig_src.rstrip("\n"))
@@ -229,12 +250,25 @@ def process_cell(py_body, orig_src, report):
     out.extend(ret_lines)
     while out and not out[0].strip():
         out.pop(0)
+    if not strip_return:
+        return out  # already at the source's own indentation (0 for `@app.function`)
     return ["    " + l if l.strip() else "" for l in out]
 
 
 def code_tokens(text):
-    return [t.string for t in tokenize.generate_tokens(io.StringIO(text).readline)
-            if t.type not in IGNORED]
+    out = []
+    for t in tokenize.generate_tokens(io.StringIO(text).readline):
+        if t.type in IGNORED:
+            continue
+        s = t.string
+        if t.type == tokenize.STRING and "\n" in s:
+            # Rebuilding a cell body can rstrip trailing whitespace on blank
+            # lines inside a multi-line docstring/string; that's cosmetic,
+            # not a code change, so normalize per-line trailing whitespace
+            # before comparing.
+            s = "\n".join(ln.rstrip() for ln in s.split("\n"))
+        out.append(s)
+    return out
 
 
 def process_file(ipynb_path, py_path, write=False):
@@ -250,31 +284,45 @@ def process_file(ipynb_path, py_path, write=False):
     tree = ast.parse(src)
     cells = [n for n in tree.body if isinstance(n, ast.FunctionDef) and any(
         getattr(d, "attr", "") == "cell" for d in n.decorator_list)]
+    # `@app.function`: marimo hoists a def with no cross-cell free-variable
+    # deps out of the reactive graph; the whole def is real user code
+    # (1:1 with its original cell) rather than a `def _(...): ... return`
+    # wrapper, so it needs different body/return handling below.
+    funcs = [n for n in tree.body if isinstance(n, ast.FunctionDef) and any(
+        getattr(d, "attr", "") == "function" for d in n.decorator_list)]
+    all_nodes = sorted([(n, "cell") for n in cells] + [(n, "function") for n in funcs],
+                        key=lambda t: t[0].lineno)
 
     pairs, n_content = [], 0
-    for node in cells:
-        if not isinstance(node.body[-1], ast.Return):
-            continue
-        if is_noncontent_cell(node.body[:-1]) != "content":
-            continue
+    for node, kind in all_nodes:
+        if kind == "cell":
+            if not isinstance(node.body[-1], ast.Return):
+                continue
+            if is_noncontent_cell(node.body[:-1]) != "content":
+                continue
         if n_content >= len(orig_content_idx):
             report.append("  SKIP: more content cells than orig")
             return report, True
-        pairs.append((node, orig_content_idx[n_content]))
+        pairs.append((node, kind, orig_content_idx[n_content]))
         n_content += 1
     if n_content != len(orig_content_idx):
         report.append(f"  SKIP: content cells {n_content} != orig {len(orig_content_idx)}")
         return report, True
 
     new_lines = list(lines)
-    for node, oidx in reversed(pairs):
-        hdr_end = node.body[0].lineno - 1
-        while hdr_end > node.lineno and (
-                not lines[hdr_end - 1].strip()
-                or lines[hdr_end - 1].strip().startswith("#")):
-            hdr_end -= 1
-        body_start, body_end = hdr_end, node.end_lineno
-        result = process_cell(lines[body_start:body_end], orig_cells[oidx], report)
+    for node, kind, oidx in reversed(pairs):
+        if kind == "function":
+            body_start, body_end = node.lineno - 1, node.end_lineno
+            result = process_cell(lines[body_start:body_end], orig_cells[oidx], report,
+                                   strip_return=False)
+        else:
+            hdr_end = node.body[0].lineno - 1
+            while hdr_end > node.lineno and (
+                    not lines[hdr_end - 1].strip()
+                    or lines[hdr_end - 1].strip().startswith("#")):
+                hdr_end -= 1
+            body_start, body_end = hdr_end, node.end_lineno
+            result = process_cell(lines[body_start:body_end], orig_cells[oidx], report)
         if result is None:
             report.append(f"  FAIL in cell {oidx}: cell left untouched")
             continue
