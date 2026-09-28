@@ -1,6 +1,8 @@
 # RESOURCES.qmd Format
 
-`RESOURCES.qmd` is the curated set of trusted sources for this topic. Knowledge for explainers should be drawn from here, not from parametric guesses. Wisdom comes from the communities listed here.
+`RESOURCES.qmd` is the curated set of trusted sources for this topic (mdBook workspaces: `<book-dir>/src/resources.md`). Knowledge for explainers should be drawn from here, not from parametric guesses. Wisdom comes from the communities listed here.
+
+The template below shows the Quarto flavor; in an mdBook workspace drop the YAML front matter and open with an H1 instead.
 
 ## Structure
 

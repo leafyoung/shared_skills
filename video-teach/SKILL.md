@@ -1,5 +1,5 @@
 ---
-name: video-course
+name: video-teach
 description: >-
   Build a full study course from a list of YouTube lecture videos, laid out as
   one workspace: one git repo, one `uv` project, one folder per
@@ -11,7 +11,6 @@ description: >-
   YouTube playlist", or otherwise wants the video→transcript→slides→lessons→
   notebooks pipeline over one or more lecture URLs. Pairs with the `teach` skill
   (teaching rules, mdBook format) and the `transcribe-video` skill (transcription).
-argument-hint: "<youtube-url> [<youtube-url>...] — videos in watch order"
 ---
 
 # Build a video course workspace
@@ -36,18 +35,30 @@ The video content itself is **ground truth**: never teach from parametric memory
 when a transcript or slide says otherwise. Web-search only for things the video
 implies but doesn't state (links, paper citations, published course materials).
 
+**The transcript is a first-class input to everything downstream** — not a
+byproduct of Step 2. Lessons take their structure, derivations, and emphasis
+from the spoken narrative (the lecturer's ordering, motivation, and emphasis
+are the course's pedagogy), joined to the slide record by timestamp; notebooks
+implement what the transcript works through; the slides index captures what
+each slide shows. Author from the transcript outward: read it end-to-end for
+the argument's shape before writing anything, then reconcile against the slide
+images where they disagree — the image outranks the spoken word on formulas
+and numbers, the transcript outranks the slide on reasoning and motivation.
+
 ## Workspace layout (create once per course)
 
 ```
 <course>/
 ├── AGENTS.md              # how to work here: layout + conventions (adapt on init)
-├── MISSION.qmd            # teach-skill mission (root, canonical)
+├── MISSION.qmd            # teach-skill mission (root — video-course flavor, see below)
 ├── RESOURCES.qmd          # acquisition ledger (root, canonical; snapshots live per-episode)
 ├── NOTES.qmd              # scratchpad (root, canonical)
 ├── MEDIA.md               # pointer to the gitignored video cache (heavy-data policy)
-├── pyproject.toml         # ONE uv project for the whole course (marimo, pillow, pytest, ruff)
+├── pyproject.toml         # ONE uv project for the whole course (marimo — pin the
+│                          #   version, pillow, pytest, ruff)
 ├── .python-version        # 3.12 unless the course needs otherwise
-├── .gitignore             # mdbook/book/, output/, __pycache__, caches
+├── .gitignore             # mdbook/book/, output/, __pycache__, caches,
+│                          #   transcript intermediates (.webm, .groq.*, raw .srt)
 ├── mdbook/                # the course book (teach-skill mdBook flavor)
 │   ├── book.toml          #   scaffold per teach/MDBOOK.md Route A (admonish+katex+text-fix)
 │   ├── src/SUMMARY.md     #   one Part per episode; every file listed or it won't render
@@ -67,8 +78,11 @@ implies but doesn't state (links, paper citations, published course materials).
 ```
 
 **Canonical vs book.** MISSION/RESOURCES/NOTES stay `.qmd` at the root (the user
-reads them in editors and quarto). The book gets an `about.md`
-summary, not duplicates. Reference docs live in the book (it's the living format).
+reads them in editors and quarto) — this is the teach skill's sanctioned
+**video-course flavor** of the state-doc rule: root `.qmd` state docs kept as
+editor-readable ledgers, deliberately never rendered (no root `_quarto.yml`); the
+book's `about.md` is the in-book summary, not a duplicate. Reference docs live in
+the book (it's the living format). Record the flavor choice in `NOTES`.
 Every mdBook rule — toolchain pinning, plugin wiring, SUMMARY completeness,
 zero-warning build bar, style table — is in the teach skill's `MDBOOK.md`; follow it,
 starting from its `assets/book.toml`.
@@ -79,6 +93,13 @@ use a hatchling multi-package pyproject. Notebooks are
 **marimo, never Jupyter** (user preference; also a teach-skill rule).
 
 ## Episode pipeline
+
+**Step 0 — teach first-session flow (new course only).** Run teach's mandatory
+first-session steps before authoring: mission interview, format confirmation
+(mdbook here), research + dependency-map plan, then stop and wait for the
+user's go-ahead. Steps 1–3 below are mechanical (download/transcribe/slides)
+and may run while that interview and planning happen; no lesson authoring
+before the go-ahead.
 
 Work episodes in watch order. Steps 1–3 are mechanical and can run while you author
 an earlier episode's lessons; authoring (Steps 4–6) is where the care goes.
@@ -96,8 +117,13 @@ yt-dlp -f "bv*[height<=1080]+ba/b[height<=1080]" --merge-output-format mp4 --no-
 
 - On `HTTP 403`/`HTTP 500` (SABR/client problem, not staleness — see transcribe-video
   skill): retry with `--extractor-args "youtube:player_client=visionos"`.
+- Export once for the commands below: `MEDIA_DIR=~/work/<course-slug>-media` and
+  `VIDEO=$MEDIA_DIR/<course>-ep<N>-<slug>.mp4`. Expand a playlist URL into
+  per-episode URLs first (`yt-dlp --flat-playlist --print url <playlist-url>`), one
+  episode each; `--no-playlist` then guards single-video fetches.
 - Fetch `%(title)s`, `%(channel)s`, `%(duration_string)s` first and use the real title
-  to pick the episode `<slug>` (dash-case, descriptive: `ep2_tool_use`).
+  to pick the episode `<slug>` (lowercase, descriptive, one separator style per
+  course: `ep2_tool_use` or `ep2-tool-use`).
 - The video is downloaded **once** and reused for both transcription and slide
   extraction — a shared file guarantees slide timestamps align with transcript
   timestamps. Never transcribe from a separate YouTube audio download when slides
@@ -111,7 +137,14 @@ Invoke the transcribe-video skill and follow it exactly. Course-specific points:
   (or the actual language) and `--output-dir <episode>/transcript --output-name <slug>`
   so outputs land with the right names in the right place on the first pass.
 - Do the full clean (`.clean.md` with `##` section headers at spoken topic shifts,
-  `.clean.srt`, `.clean.zh.md` for non-Chinese content) and run `verify_clean.py`.
+  `.clean.srt`; plus `.clean.zh.md` when the source is non-Chinese — transcribe-video
+  skips translation for Chinese content) and run the transcribe-video skill's
+  `scripts/verify_clean.py`. Keep the raw SRT until verification and the episode
+  checklist pass. This skill also ships `scripts/dedup_srt.py` (malformed-entry
+  removal, reversal detection, word-overlap dedup — English-oriented) and
+  `scripts/srt_from_clean.py` (rebuild the clean SRT from the finished `.clean.md`,
+  globally aligned) — use them where transcribe-video's current version permits
+  helper scripts, else follow its inline recipe.
 - Build the per-video proper-noun correction list early (lecture courses have many:
   names, systems, library names). For technical lectures, preserve formulas inline
   and describe key diagrams/slides as the skill directs.
@@ -124,7 +157,7 @@ Invoke the transcribe-video skill and follow it exactly. Course-specific points:
 Run the skill's extractor, then review and index:
 
 ```bash
-cd ep<N>_<slug> && python3 ~/.agents/skills/video-course/scripts/extract_slides.py "$VIDEO" \
+cd ep<N>_<slug> && python3 ~/.agents/skills/video-teach/scripts/extract_slides.py "$VIDEO" \
   [--scene-threshold 0.25] [--sample-interval 20]
 ```
 
@@ -159,6 +192,10 @@ truths first, exercises with answer keys, citations, ZPD) all apply unchanged.
 - Course content comes from the episode's `slides/README.md` (densest source) and
   `transcript/*.clean.md` (narrated derivations, joined by timestamp). The lecture
   tells you *what to teach and in what order*; the teach rules tell you *how*.
+- Lesson language: the course's language — the user's stated preference, else the
+  transcript's language. Teach's per-language mirror books (`lessons_md/` +
+  `lessons_md_zh/` lockstep) apply only when the user explicitly requests a
+  translated course; otherwise author one book in the course language.
 - 2–4 lessons per lecture hour, each one tightly-scoped, self-contained, with a
   single tangible win and its `## Exercises`/`## Answers` sections. A lesson with
   unanswered exercises must not ship.
@@ -201,8 +238,7 @@ explicit streaming-only/paywalled note.
 
 Each episode gets `epN_<slug>/notebooks/<slug>.py` — an interactive companion that
 runs the lecture's central artifact: the algorithm the lecture teaches, the
-worked example, the visualization of the phenomenon. Conventions (see
-an established marimo demo register):
+worked example, the visualization of the phenomenon. Conventions:
 
 - marimo app with `app_title`, `hide_code` markdown cells explaining each section,
   LaTeX via `$...$`/`$$...$$` in `mo.md`, interactive controls (`mo.ui.slider`,
@@ -210,12 +246,15 @@ an established marimo demo register):
 - Self-contained: synthetic data or tiny bundled samples by default; if it needs a
   download, cache into `epN_<slug>/data/` and degrade gracefully offline.
 - **Verify by execution**: `uv run python
-  ~/.agents/skills/video-course/scripts/run_marimo_notebook.py
-  epN_<slug>/notebooks/<slug>.py` — it imports the module and runs every cell via
-  `app.run(defs={"mo": marimo})`; any exception is a bug. (Plain `marimo export html`
-  is NOT a reliable verifier here: its headless cell execution can fail to inject `mo`
-  even for correct notebooks.) Reference the notebook from the episode overview chapter
-  and the relevant lessons (repo-relative path in prose).
+  ~/.agents/skills/video-teach/scripts/run_marimo_notebook.py
+  epN_<slug>/notebooks/<slug>.py` — it imports the module, runs every cell via
+  `app.run(defs={"mo": marimo})`, and detects a raised cell by diffing the
+  notebook's statically declared cell outputs against the definitions the run
+  actually produced (headless marimo swallows plain cell exceptions —
+  verified on 0.25.0). Any failure exits nonzero. (Plain `marimo export html`
+  is NOT a verifier here: it exits 0 on broken cells AND wrongly exits 1 on
+  correct mo-using notebooks.) Reference the notebook from the episode overview
+  chapter and the relevant lessons (repo-relative path in prose).
 
 ### Step 7 — Wrap the episode
 
@@ -224,9 +263,10 @@ an established marimo demo register):
 2. Learning records when the session surfaced something non-obvious (a ZPD finding,
    a transcription convention decision, a bug in extracted material).
 3. Update root `RESOURCES.qmd` / `NOTES.qmd`; bump the episode's row in the book's
-   `about.md` progress table if you keep one.
-4. `git add` + one commit per episode (`ep3: transcript, slides, 3 lessons, notebook`).
-   A clean episode boundary makes partial progress safe.
+   `about.md` progress table (keep this table — it is the resume anchor).
+4. Commit at episode boundaries (`ep3: transcript, slides, 3 lessons, notebook`); on a
+   long episode, commit at pipeline-step boundaries too (`ep3: transcript + slides`) —
+   never leave hours of transcript/slide work uncommitted.
 
 ## Conventions
 
@@ -237,18 +277,27 @@ an established marimo demo register):
 - **Honest gaps**: if a notebook can't reproduce a claimed number (library drift,
   missing data), say so in the episode README with what was checked — never tune
   until it matches.
-- **Per-episode placement is not negotiable**: only MISSION/RESOURCES/NOTES/MEDIA/
-  pyproject/mdbook are root-level; everything else lives in `epN_<slug>/`.
+- **Per-episode placement is not negotiable**: only AGENTS.md, MISSION/RESOURCES/NOTES/
+  MEDIA, pyproject.toml, .python-version, .gitignore, and mdbook/ are root-level;
+  everything else lives in `epN_<slug>/`.
+- **New session in an existing course**: read AGENTS.md → NOTES.qmd → the book's
+  `about.md` progress table → `git log --oneline` + `git status` → the current
+  episode's README.md, then resume the pipeline at its first incomplete step (the
+  checklist below defines each step's end state: transcript files present = Step 2
+  done, `slides/README.md` present = Step 3 done, …).
 - Skill-scripts and extractors are regenerable; never commit `.venv`, caches,
   build output, or media.
 
 ## Verification checklist (per episode, before commit)
 
-- [ ] transcript: `.clean.md`/`.clean.srt`/`.clean.zh.md` present; `verify_clean.py` passes
+- [ ] transcript: `.clean.md` + `.clean.srt` present (plus `.clean.zh.md` when the source
+      is non-Chinese); the transcribe-video skill's `verify_clean.py` passes
 - [ ] slides: count sane vs lecture length; every PNG named `slideK_<slug>_<MmSSs>.png`;
       `slides/README.md` table covers every slide with formulas verified against images
 - [ ] book: new chapters in `SUMMARY.md`; `mdbook build` zero warnings; exercises all answered
-- [ ] notebook: `marimo export html` runs clean; linked from the episode's book chapters
+- [ ] notebook: `run_marimo_notebook.py` exits 0 — the execution bar; headless
+      `marimo export html` can silently skip `mo` injection (an HTML export into
+      `output/` is optional); linked from the episode's book chapters
 - [ ] resources: every RESOURCES.qmd entry added this session has a local path or
       streaming-only note
 - [ ] episode README current; one git commit for the episode

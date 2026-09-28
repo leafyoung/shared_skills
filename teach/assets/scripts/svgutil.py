@@ -1,15 +1,18 @@
 """Tiny shared helpers for hand-composed teaching-lesson SVG figures.
 
-Not a charting library — just enough string-building to keep the 8 figure
-scripts in this directory free of raw XML boilerplate and float-repr noise
-(e.g. "126.90000000000001"). Each figure script still lays out its own
-geometry; this only formats tags.
+Not a charting library — just enough string-building to keep a workspace's
+figure scripts free of raw XML boilerplate and float-repr noise (e.g.
+"126.90000000000001"). Each figure script still lays out its own geometry;
+this only formats tags. Copy it into the workspace's assets/scripts/ once
+(self-contained, not a cross-project import).
 """
 
 from __future__ import annotations
 
-# Confirmed resolvable by `typst fonts` on this workstation. Use FONT_ZH (in
-# place of the usual "Helvetica, Arial, sans-serif" literal) for every text()
+# FONT_ZH covers macOS (Heiti SC / PingFang SC) and Linux (Noto Sans CJK SC);
+# re-verify on each new workstation with your font tooling (`fc-list`,
+# `typst fonts`). Use FONT_ZH (in place of the usual
+# "Helvetica, Arial, sans-serif" literal) for every text()
 # call in a script's Chinese-label variant.
 FONT_EN = "Helvetica, Arial, sans-serif"
 FONT_ZH = "Heiti SC, PingFang SC, Noto Sans CJK SC, sans-serif"
@@ -17,7 +20,10 @@ FONT_ZH = "Heiti SC, PingFang SC, Noto Sans CJK SC, sans-serif"
 
 def lang_from_argv(default="en"):
     """`python3 scriptname.py zh` selects the Chinese label variant; no arg
-    (or 'en') keeps the original English output filename and labels."""
+    (or 'en') keeps the original English output filename and labels.
+    Filename convention: the zh variant is written to `<name>-zh.svg`
+    (pass that path to write_svg) — normalized_diff.py strips the suffix
+    when pairing English/Chinese lesson trees."""
     import sys
     return sys.argv[1] if len(sys.argv) > 1 else default
 

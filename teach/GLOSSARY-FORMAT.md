@@ -1,6 +1,8 @@
 # GLOSSARY.qmd Format
 
-`GLOSSARY.qmd` is the canonical language for this teaching workspace. All explainers, exercises, and learning records should adhere to its terminology. Building it is itself part of learning: compressing a concept into a tight definition is evidence the user understands it.
+`GLOSSARY.qmd` is the canonical language for this teaching workspace (mdBook workspaces: `<book-dir>/src/glossary.md`). All explainers, exercises, and learning records should adhere to its terminology. Building it is itself part of learning: compressing a concept into a tight definition is evidence the user understands it.
+
+The template below shows the Quarto flavor; in an mdBook workspace drop the YAML front matter and open with an H1 instead.
 
 ## Structure
 

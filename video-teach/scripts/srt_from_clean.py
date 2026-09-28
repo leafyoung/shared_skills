@@ -5,6 +5,8 @@ raw SRT token stream (the approach the transcribe-video skill pinned in 0.19.0:
 never per-sentence sliding windows — they cascade). Each markdown sentence gets
 the time span of the matching blocks that overlap its token range; unmatched
 (corrected/dropped) tokens interpolate between their matched neighbors.
+Tokenization is English-oriented: CJK sentences become unresolved and
+interpolate between their matched neighbors.
 
 Usage:
     python3 srt_from_clean.py CLEAN.md DEDUP.srt OUT.clean.srt
@@ -60,7 +62,7 @@ def sentences_from_md(path: Path):
         if line.startswith("#"):
             heading = re.sub(r"^#+\s*", "", line)
             continue
-        if line.startswith((">|", "|", "```", "---", "![")):
+        if line.startswith((">", "|", "```", "---", "![")):
             continue
         line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", line)   # links -> text
         line = re.sub(r"\*\*?([^*]+)\*\*?", r"\1", line)        # bold/italics

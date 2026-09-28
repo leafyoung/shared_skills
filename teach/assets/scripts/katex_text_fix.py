@@ -3,19 +3,26 @@
 
 mdbook-katex injects KaTeX's HTML directly into the markdown source. Inside a
 paragraph, the text between those injected tags is still parsed as markdown
-inline content — and a raw `_` there (emitted for LaTeX like `\\text{a\\_b}`)
-can pair with another raw `_` across span boundaries into `<em>`, producing
+inline content — and a raw `_` there (emitted for LaTeX like `a \\_ b`) can
+pair with another raw `_` across span boundaries into `<em>`, producing
 "unclosed <span>" build warnings and garbled math. This preprocessor walks
 every `class="katex…"` chunk and backslash-escapes `_`/`*` in its text nodes
 (`futures_level` -> `futures\\_level`), which pulldown-cmark renders back as
-literal characters.
+literal characters. It is safe because KaTeX's HTML output only emits raw
+`_`/`*` at token edges (ordinary subscripts render as positioned spans, never
+a bare `_`) — a property of KaTeX's output, not of this script's logic.
+`<math>` (MathML) subtrees — including the `x-tex` annotation — are skipped
+verbatim so the assistive-tech copy is untouched.
 
-Usage: copy next to the book and wire in book.toml:
+Usage: copy into the book root (mdbook runs the command with cwd = the book
+dir) and wire in book.toml:
 
     [preprocessor.katex-text-fix]
     command = "python3 katex_text_fix.py"
-    after = ["katex"]   # required — without it mdbook sorts preprocessors
-                        # alphabetically and runs this BEFORE katex, a no-op
+    after = ["katex"]   # mdbook 0.5 runs preprocessors alphabetically by
+                        # config name, ignoring declaration order, which
+                        # already puts katex first — the directive pins that
+                        # against renames (verified on mdbook 0.5.4)
 
 Must exit 0 on the `supports <renderer>` probe or mdbook silently skips it.
 
@@ -49,12 +56,18 @@ def escape_text_nodes(chunk_open_tag: str, rest: str) -> tuple[str, int]:
             depth += -1 if tag.group(0)[1] == "/" else 1
             j = tag.end()
         elif rest[j] == "<":
-            # a non-span tag inside the chunk (e.g. MathML <math>…</math>) —
-            # keep verbatim, advance past it (never re-examine the same '<')
             close = rest.find(">", j)
             nxt = close + 1 if close != -1 else len(rest)
-            buf.append(rest[j:nxt])
+            tag_text = rest[j:nxt]
+            buf.append(tag_text)
             j = nxt
+            if tag_text.lower().startswith("<math"):
+                # MathML subtree (assistive-tech copy + x-tex annotation):
+                # copy verbatim through the matching </math> — never escape it.
+                end = rest.lower().find("</math>", j)
+                if end != -1:
+                    buf.append(rest[j : end + len("</math>")])
+                    j = end + len("</math>")
         else:
             nxt = rest.find("<", j)
             if nxt == -1:

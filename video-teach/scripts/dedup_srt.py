@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 """Dedup a raw Whisper/Groq SRT per the transcribe-video skill's srt-cleaning.md:
 remove malformed entries (end < start), detect timestamp reversals at chunk
-boundaries, drop the before-entries that word-overlap the after-entries, then
+boundaries, drop the before-entries that word-overlap an after-entry, then
 renumber. Also word-diffs the joined SRT text against the .txt and reports
 dropped words (chunk-boundary word losses; recover them while writing the .md).
 
-Usage (writes <out>.dedup.srt next to the input; run from any cwd):
-    python3 dedup_srt.py RAW.srt [--out suffixed_copy_path]
+Tokenization is ASCII-word based: the reversal/overlap repair is effective on
+English transcripts only — on CJK content this pass reduces to malformed-entry
+removal and renumbering.
+
+Usage (writes RAW.dedup.srt next to the input; run from any cwd):
+    python3 dedup_srt.py RAW.srt [--txt RAW.txt]
 """
 import argparse
 import difflib
 import re
 import sys
 from pathlib import Path
-
-
-def ts_to_s(ts: str) -> float:
-    h, m, rest = ts.split(":")
-    s, ms = rest.split(",")
-    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
 
 
 def parse_srt(path: Path):

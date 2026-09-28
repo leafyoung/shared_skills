@@ -19,12 +19,13 @@ and writes only into the fixed relative folder `slides_raw/`:
 Requires ffmpeg/ffprobe on PATH and Pillow. Outputs in ./slides_raw/:
     chosen/sNN_<MmSSs>.png   full-res candidate, one per slide window
     contact_sheet.jpg        labeled grid of candidates for review
-    candidates.tsv           per-group report (times, sample count, kept/rejected)
+    candidates.tsv           per-group report (index, window start/end, frame, samples, kept)
 """
 import argparse
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,9 +44,14 @@ def ffprobe_duration_fps(video: Path) -> tuple[float, float]:
          "-show_entries", "stream=duration,r_frame_rate",
          "-of", "default=noprint_wrappers=1", str(video)],
         check=True, capture_output=True, text=True, shell=False).stdout
-    dur = float(re.search(r"duration=([0-9.]+)", out).group(1))
+    m = re.search(r"duration=([0-9.]+)", out)
+    if not m:
+        sys.exit(f"ffprobe could not determine duration for {video} "
+                 f"(stream duration=N/A? remux to mp4 first)")
+    dur = float(m.group(1))
     num, den = FPS_RE.search(re.search(r"r_frame_rate=([0-9/]+)", out).group(1)).groups()
-    return dur, float(num) / float(den)
+    fps = float(num) / float(den) if float(den) else 30.0
+    return dur, fps
 
 
 def ffmpeg_scan(video: Path, fps: float, args) -> list[tuple[float, Path]]:
@@ -147,6 +153,9 @@ def main():
         import PIL  # noqa: F401
     except ImportError:
         sys.exit("Pillow required: uv add pillow / pip install pillow")
+    for tool in ("ffmpeg", "ffprobe"):
+        if shutil.which(tool) is None:
+            sys.exit(f"{tool} not found on PATH")
     if not args.video.is_file():
         sys.exit(f"no such video: {args.video}")
 
@@ -174,6 +183,8 @@ def main():
     tsv = ["group\tfirst\tlast\tfile\tn_samples\tstatus"]
     tsv += ["\t".join(map(str, r)) for r in rows]
     Path(OUT, "candidates.tsv").write_text("\n".join(tsv) + "\n")
+    if not keepers:
+        sys.exit("no slide windows found — lower --scene-threshold and re-run")
     contact_sheet(keepers)
     print(f"{len(keepers)} slide candidates in {OUT}/chosen\n"
           f"review: {OUT}/contact_sheet.jpg + {OUT}/candidates.tsv\n"

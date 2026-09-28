@@ -1,6 +1,8 @@
 # MISSION.qmd Format
 
-`MISSION.qmd` lives at the workspace root. It captures the _reason_ the user is learning this topic. Every teaching decision — what to teach next, which resources to surface, which exercises to design — should trace back to this document.
+`MISSION.qmd` lives at the workspace root (mdBook workspaces: `<book-dir>/src/mission.md`). It captures the _reason_ the user is learning this topic. Every teaching decision — what to teach next, which resources to surface, which exercises to design — should trace back to this document.
+
+The template below shows the Quarto flavor; in an mdBook workspace drop the YAML front matter and open with `# Mission: {Topic}` instead.
 
 ## Template
 

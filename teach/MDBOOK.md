@@ -14,10 +14,15 @@ build differ.
   "something I can browse and search") rather than per-lesson PDFs.
 - The course is long / non-linear enough that a sidebar + full-text search
   beats a pile of PDFs.
-- Choose once per workspace and record the choice in `NOTES` (mdbook
-  workspaces: `mdbook/src/NOTES.md`). Never mix formats inside one workspace.
+- Choose once per workspace and record the choice in `NOTES`
+  (`<book-dir>/src/NOTES.md`). Never keep the same lessons in two living
+  formats inside one workspace.
 
-Quarto stays the default for print-oriented, Tufte-style lessons.
+mdbook is the **default** for lessons; quarto remains for genuinely
+print-first deliverables. Where the state documents live — and the one
+sanctioned exception (root Quarto reference docs, the "linkage route") —
+is stated once in SKILL.md "Output Formats"; the layout below is the
+canonical form this guide assumes.
 
 ## Toolchain — exact versions, no substitutions
 
@@ -36,6 +41,10 @@ cargo install mdbook mdbook-katex mdbook-mermaid
 cargo install --git https://github.com/tixena/mdbook-admonish mdbook-admonish --force
 ```
 
+Binaries land in `~/.cargo/bin`. When scaffolding a workspace, record
+`cargo install --list | grep -i mdbook` in its `NOTES` so a later session
+can detect drift against the verified combo below.
+
 | Crate | Source | Role |
 | --- | --- | --- |
 | mdbook | crates.io, latest (0.5.x) | the builder |
@@ -48,7 +57,8 @@ Verified working combo (2026-09-26): mdbook 0.5.4 + mdbook-katex 0.10.0 + mdbook
 warnings). mdbook 0.5 changed the **preprocessor protocol** (details in the gotchas):
 stdin is `[context, book]` with `book = {"items": [...]}` (0.4 used `sections`), but the
 preprocessor must output **only the book object** — echoing `[context, book]` back fails
-with `invalid type: map, expected a sequence`.
+with `invalid type: map, expected a sequence` (message re-verified verbatim
+on 0.5.4, 2026-09-28).
 
 **Version-skew warnings ("built against 0.5.1/0.5.3, called from 0.5.4")** mean the
 plugin binary was compiled against an older `mdbook-preprocessor` than the `mdbook`
@@ -73,20 +83,36 @@ that it's a mdbook-0.5-compatible release).
 
 ## Workspace layout (mdbook flavor)
 
-Same teaching content as the Quarto flavor, inside `./mdbook/`:
+Same teaching content as the Quarto flavor, inside `./mdbook/` — this is
+the **canonical layout**: every state document lives in the book. The dir
+name is a convention, not a requirement — a translated workspace keeps one
+full-mirror book per language (`lessons_md/` + `lessons_md_zh/`), kept in
+lockstep, see "Mirrors, sync, and verification" in SKILL.md. mdBook pages
+carry an **H1 title and no YAML frontmatter** (front matter is a qmd
+thing; the H1 is what Route B's "strip the front matter" becomes):
 
 - `book.toml` — build config (start from [`assets/book.toml`](./assets/book.toml))
 - `src/SUMMARY.md` — the table of contents; **every chapter file must be
   listed here or mdBook will not render it**
 - `src/mission.md` — the mission (MISSION.qmd equivalent)
 - `src/lessons/0001-<name>.md` — lessons, numbered in teaching order
-  (match the naming style already in the workspace: this collection uses
-  underscore-separated `000n_slug.md`)
-- `src/reference/*.md`, `src/resources.md`, `src/NOTES.md`,
-  `src/learning-records/*.md` — same roles as the Quarto flavor
+  (match the naming style already in the workspace; the argus-teach books
+  use dash-separated `000N-slug.md` — underscores are the companion
+  *notebook* files' convention, not the lessons')
+- `src/reference/*.md`, `src/resources.md`, `src/glossary.md`,
+  `src/NOTES.md`, `src/learning-records/*.md` — same roles as the Quarto
+  flavor. `NOTES.md` and `learning-records/` are agent-facing state: keep
+  them **out of `SUMMARY.md`** and don't link lessons to them (unlisted =
+  silently unrendered, which is exactly what state wants)
 - `src/assets/` — figures and their regeneration scripts (same rule as
   Quarto: every figure's generation code is a first-class component)
-- `book/` — build output (add to `.gitignore`)
+- `book/` — build output (gitignore by default; a workspace whose other
+  artifacts link into the built pages — reference-doc PDFs, notebook
+  headers — may commit it instead, as linkage does)
+
+(Linkage-route workspaces — see SKILL.md "Output Formats" — keep
+GLOSSARY/MISSION/NOTES/RESOURCES as root Quarto docs instead; the layout
+above then applies to lessons, reference pages, and assets only.)
 
 ## book.toml and plugin wiring
 
@@ -107,16 +133,20 @@ has diagrams. Two wiring rules that are easy to get wrong:
 
 1. Probe and plan exactly as in SKILL.md (mission interview, dependency-map
    plan, resource acquisition) — format changes nothing there.
-2. Scaffold: `mkdir -p mdbook/src/lessons mdbook/src/reference` and write
-   `book.toml` from [`assets/book.toml`](./assets/book.toml) (fill in the
-   title; copy the text-fix preprocessor script next to the book or point
-   `command` at its absolute path).
+2. Scaffold: `mkdir -p <book-dir>/src/lessons <book-dir>/src/reference`
+   and write `book.toml` from [`assets/book.toml`](./assets/book.toml)
+   (fill in the title; copy the text-fix preprocessor script **into the
+   book root** — mdbook runs `command` with cwd = the book dir, so a bare
+   `python3 katex_text_fix.py` resolves there — or point `command` at an
+   absolute path).
 3. Wire plugins: from inside `mdbook/`, `mdbook-admonish install .` (and
    `mdbook-mermaid install .` only once a mermaid block exists). Re-check
    `book.toml` afterwards — the installers edit it.
-4. Write `src/SUMMARY.md` first (Parts + chapter list), then the mission,
-   then lessons one at a time. Every new lesson: create the `.md`, **add it
-   to `SUMMARY.md` in the same edit**, link it from its predecessors.
+4. Write `src/SUMMARY.md` (Parts + chapter list) — **list only files that
+   exist**: with `create-missing = false` a listed-but-unwritten chapter is
+   a build error. Then the mission, then lessons one at a time. Every new
+   lesson: create the `.md`, **add it to `SUMMARY.md` in the same edit**,
+   link it from its predecessors.
 5. Style content per the table below (callouts, math, figures, …).
 6. Build and verify: `mdbook build` must complete with **zero warnings**;
    check every internal link resolves (build warnings catch broken `.md`
@@ -126,19 +156,34 @@ has diagrams. Two wiring rules that are easy to get wrong:
 
 ## Route B — convert an existing Quarto (qmd) course to mdBook
 
-Convert file-by-file with the mapping below, then rebuild the surrounding
-structure. The `.qmd` sources stay untouched on disk (verification record);
-the mdBook becomes the living format only if the user says so.
+Scaffold the book first if none exists (Route A steps 2–3), then convert
+file-by-file with the mapping below. Default end-state: **the book becomes
+the only living lesson source.** After conversion, prove sync with a
+normalized diff against the qmd tree
+([`assets/scripts/normalized_diff.py`](./assets/scripts/normalized_diff.py)
+implements the stripping — don't hand-roll it), then retire the qmd
+lessons — delete them (git history is the provenance record) — and record
+the retirement in `NOTES`; linkage did exactly this on 2026-09-26, and
+keeping both is how mirror drift happens. Keeping the qmd lessons is the
+one exception and a **confirm-with-user decision**: only if they explicitly
+want the print format maintained too — it decides whether the root
+`_quarto.yml` survives (if not, clean up its now-dangling
+`lessons/**/*.qmd` render globs).
 
 | Quarto construct | mdBook rewrite |
 | --- | --- |
-| YAML front matter | strip; the `title` becomes the `SUMMARY.md` entry |
-| `::: {.callout-note/tip/important}` … `:::` | ` ```admonish note/tip/warning ` fenced block (body unchanged; `important` maps to `warning`) |
-| `{{< pagebreak >}}` | `<div class="pagebreak"></div>` (inert on web, honored by print backends) |
+| YAML front matter | strip; the `title` becomes the `SUMMARY.md` entry **and the page's H1** |
+| `@fig-x` / `@tbl-x` / `@eq-x` cross-references | no auto-numbering — rewrite to prose naming the target ("see lesson 0003's supply-curve figure") |
+| executable cells (` ```{python} `, ` ```{r} `) | pre-run; embed the code as a fenced block and its output as text/table; heavy computation → companion notebook + a link |
+| callout `collapse` / custom `title` | ` ```admonish note collapsible ` / ` ```admonish note title="…" ` |
+| shortcodes (`{{< video >}}`, …) | no equivalent — inline the rendered result by hand |
+| definition lists | bold term on its own line, body as a normal paragraph |
+| `::: {.callout-note/tip/important}` … `:::` | ` ```admonish note/tip/danger ` fenced block (body unchanged; `important` maps to `danger`, not `warning` — Quarto typst renders `important` red `#CC1914` and `danger` is admonish's red; the neg-bal-abuse ERRATA notes depend on this. Plain `caution` is *orange* in Quarto and maps to `warning`) |
+| `{{< pagebreak >}}` | `<div class="pagebreak"></div>` (inert on web; honored only by a print pipeline that styles `.pagebreak`) |
 | `{{< include x.qmd >}}` | inline the converted fragment |
 | ` ```{mermaid} ` + `%%\|` chunk options | ` ```mermaid ` with the `%%|` lines dropped |
-| `![caption](img)` | keep — alt text still shows on hover |
-| `![caption](img){width=95%}` | `<img src="…" alt="" style="width:95%;">` + the caption as an italic line below (pandoc attributes are silently dropped otherwise) |
+| `![caption](img)` | convert to the captioned-figure form (image + italic caption line below) — alt-text-only captions are invisible in mdBook (hover needs a `title`, which markdown images don't set) |
+| `![caption](img){width=95%}` | `<img src="…" alt="" style="width:95%;">` + the caption as an italic line below (left alone, the `{width=95%}` renders as stray literal text) |
 | `](other.qmd)` links | `](other.md)` — mdBook rewrites intra-book `.md` links to `.html` |
 | `mission.qmd`, `glossary.qmd`, … | `mission.md`, `glossary.md`, … in `src/` per the layout above |
 
@@ -181,11 +226,14 @@ broke once):
   `](NNNN-x.qmd)` → `.md`; cross-episode `](../../epY/lesson/NNNN.qmd)` →
   `](../epY/NNNN.md)`; images `](../assets/X.png)` → `](../../assets/X.png)`; links to repo
   files outside the book (episode `src/`, `tests/`, `paper/`, figure scripts) → disk paths
-  (`../../../../<ep>/…`, climbing from the built page to the repo root). See gotchas for the
-  `.md`-suffix rule.
+  (`../../../../<ep>/…`, climbing from the built page to the repo root). (Gotchas has the
+  `.md`-suffix rule.) Links to agent-facing state (`NOTES.md`,
+  learning records) don't belong in lessons at all — drop them while
+  converting.
 - **Out-of-book `.md` targets (episode READMEs, AGENTS.md, learning records): link the
   containing directory, never the `.md` file** — mdbook rewrites every `.md`-suffixed href to
-  `.html`, *including* raw-HTML `<a href>` anchors, silently breaking disk targets. A
+  `.html`, *including* raw-HTML `<a href>` anchors (verified 2026-09-28 on 0.5.4: a raw
+  `<a href="../OUTSIDE.md">` came out as `../OUTSIDE.html`), silently breaking disk targets. A
   directory target (`../../../../<ep>/`) is never rewritten and opens fine from the
   filesystem. These disk links work when browsing `book/index.html` directly but 404 under
   `mdbook serve` (which only serves `book/`) — state the intended reading mode.
@@ -196,15 +244,18 @@ broke once):
 - **Cross-episode links go stale when a target episode renames its lessons** (slugs change,
   numbers usually don't). Check every cross-episode link target *exists*; on a miss, fall
   back to the same-numbered lesson in the target episode and log the repair.
-- **Order `SUMMARY.md` parts numerically, not lexically** — plain string sort puts Episode
-  10 and 11 between 1 and 2.
+- **Order `SUMMARY.md` parts numerically, not lexically** — a plain string sort puts Episode
+  10 and 11 between 1 and 2 (matters when the SUMMARY is generated by a script; mdbook itself
+  renders entries in file order).
 - Links to gitignored fetch-time artifacts (e.g. `paper/*.pdf` restored by the episode's
   `download.py`) are legitimate; whitelist them in the link checker rather than deleting the
   links.
 
-After conversion: write `SUMMARY.md` (titles from the old front matter),
-wire plugins, build, and run the full verification bar. Then fix content
-bugs in the **book** — do not regenerate from qmd unless the user asks.
+After conversion: write `SUMMARY.md` (titles from the old front matter —
+matching what the normalizer expects: each lesson's H1 equals its old
+front-matter `title`), wire plugins, build, and run the full verification
+bar. Then fix content bugs in the **book** — do not regenerate from qmd
+unless the user asks.
 
 ## Style: what to use for each content type
 
@@ -232,12 +283,20 @@ bugs in the **book** — do not regenerate from qmd unless the user asks.
   emphasis across the span tags → "unclosed `<span>`" build warnings and
   garbled nesting. The text-fix preprocessor (in `assets/book.toml`, script at
   `assets/scripts/katex_text_fix.py`) escapes `_`/`*` in KaTeX text nodes —
-  keep it wired, and keep its `supports` handling intact. It only ever fires
-  on raw `_`/`*` at token edges inside KaTeX's output; ordinary subscripts
-  (`x_1`) never emit raw underscores.
-- **Preprocessor ordering**: the text-fix preprocessor must declare
-  `after = ["katex"]`; mdBook otherwise sorts alphabetically and runs it
-  *before* katex, where it is a no-op.
+  keep it wired, and keep its `supports` handling intact. It is safe because
+  KaTeX's HTML output only emits raw `_`/`*` at token edges (ordinary
+  subscripts like `x_1` render as positioned spans, never a bare `_`) — that
+  is a property of KaTeX's output, not of the script's logic. The script
+  skips `<math>` (MathML) subtrees so the assistive-tech copy and the
+  `x-tex` annotation are left untouched.
+- **Preprocessor ordering**: keep `after = ["katex"]` on the text-fix
+  preprocessor. mdbook 0.5 runs custom preprocessors in **alphabetical order
+  of their config names, ignoring declaration order** (verified 2026-09-28
+  on 0.5.4: with no directives, `katex-text-fix` ran after katex in either
+  declaration position, but renaming it `a-text-fix` made it run *before*
+  katex — where it is a no-op). `katex` happens to sort before
+  `katex-text-fix`, so the directive pins a correct-by-alphabet order
+  against future renames.
 - **Preprocessor protocol (mdbook 0.5)**: stdin is the 2-element JSON
   `[context, book]` with `book = {"items": [...]}` (0.4 used `sections`);
   stdout must be **only the book object**. Echoing the input array back fails
@@ -267,26 +326,45 @@ bugs in the **book** — do not regenerate from qmd unless the user asks.
   (`about.md`).
 - **`SUMMARY.md` completeness**: a source file not listed in `SUMMARY.md` is
   silently not rendered. Add the chapter and the summary entry in one edit.
-  Sort part/chapter ordering numerically when names embed numbers — a lexical
-  sort puts item 10 and 11 between 1 and 2.
+  When generating `SUMMARY.md` by script, sort numerically when names embed
+  numbers — a lexical sort puts item 10 and 11 between 1 and 2 (mdbook
+  itself renders entries in file order).
 - **`create-missing = false`**: keep it — it turns a missing chapter into a
   build error instead of a silent gap.
 - **Offline math (no CDN)**: mdbook-katex injects a CDN `<link>` to
   `katex.min.css` by default. To self-host: download `katex.min.css` + its
   `fonts/` (jsdelivr), put the css at `src/katex.min.css` and the fonts at
   `src/fonts/`, set `[preprocessor.katex] no-css = true`, and wire
-  `additional-css = ["src/katex.min.css"]`. mdbook emits a second,
-  depth-adjusted hashed copy of the css under `book/src/` that pages actually
-  reference — its relative `fonts/` refs resolve to `book/src/fonts/`, so
-  mirror the fonts at `src/src/fonts/` too. Verify a font actually loads
-  (screenshot a math-heavy page with the network disconnected) before
-  trusting the wiring.
+  `additional-css = ["src/katex.min.css"]`. Verified on 0.5.4 (2026-09-28):
+  mdbook copies the css twice — unhashed to the output root *and* hashed to
+  `book/src/` — and pages at every depth reference the hashed `book/src/`
+  copy with a depth-adjusted relative href. That css's relative `fonts/`
+  refs therefore resolve to `book/src/fonts/`, so mirror the fonts at
+  `src/src/fonts/` too (the src subtree is copied verbatim). Verify a font
+  actually loads (screenshot a math-heavy page with the network
+  disconnected) before trusting the wiring.
 - **Verification bar for every session that touched the book**: zero
   warnings, every internal link/image resolves (spot-check the built
   `book/` HTML), and the changed page renders correctly (math, callouts,
-  diagrams) via `mdbook serve` or `book/index.html`. A tiny `check_links.py`
-  (walk every built `.html`, resolve each `href`/`src` against the book tree
-  or the repo on disk, whitelist fetch-time artifacts) makes the link half
-  mechanical; render the riskiest pages to PNG (headless chromium
+  diagrams) via `mdbook serve` or `book/index.html`. The bundled
+  [`assets/scripts/check_links.py`](./assets/scripts/check_links.py) (walk
+  every built `.html`, resolve each `href`/`src` against the book tree or
+  the repo on disk, `--allow` whitelist for fetch-time artifacts) makes the
+  link half mechanical; render the riskiest pages to PNG (headless chromium
   `--headless --screenshot`) and eyeball math/dollars/figures before calling
   a conversion or content change done.
+- **`\tilde` mis-render (mdbook-katex fork bug)**: `\tilde{X}` sometimes
+  renders as a literal `~` glyph in text (instead of a stretchy SVG accent),
+  and pulldown-cmark's GFM parser then reads a pair of these stray tildes as
+  strikethrough (`~~`) spanning across `<span>` boundaries → "unclosed/
+  unexpected `<span>`" build warnings. Confirmed trigger: **two `\tilde`
+  math spans in the same paragraph** (one `\tilde` alone is fine; `\bar`/
+  `\hat` repeated in a paragraph are also fine — this is specific to
+  `\tilde`). The katex-text-fix preprocessor does not catch this (it only
+  escapes `_`/`*`, not stray `~`). Two independent workarounds, both proven
+  in practice, pick either: (1) replace `\tilde{X}` with `\widetilde{X}`
+  (same meaning, renders as an SVG accent, no visual difference for a
+  single-letter subscript); or (2) split the offending paragraph so the two
+  `\tilde` spans land in separate paragraphs. Apply the fix in the book's
+  `.md` — the book is where mdBook-specific hazards get fixed, never a
+  still-live `.qmd` source.
