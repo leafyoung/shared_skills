@@ -1,12 +1,14 @@
 # mdBook build config template — copy to your book dir (e.g. <workspace>/mdbook/book.toml), fill in the title.
+# From the mdbook-authoring skill (~/.agents/skills/mdbook-authoring/) — the shared mdBook
+# mechanics guide for the teach / video-teach / slides-teach course skills.
 # Wire plugins from INSIDE the book dir: cd <book-dir> && mdbook-admonish install .
 # (add `mdbook-mermaid install .` only once a mermaid block exists — it edits this file too)
 # Toolchain: mdbook 0.5.x + mdbook-katex (crates.io, >=0.10) + mdbook-mermaid from crates.io;
 # mdbook-admonish must be built from the tixena/mdbook-admonish git fork
-# (crates.io 1.20.0 predates mdbook 0.5 and crashes on it) — see MDBOOK.md "Toolchain"
+# (crates.io 1.20.0 predates mdbook 0.5 and crashes on it) — see SKILL.md "Toolchain"
 # (incl. the stale-Cargo.lock fix for git-installed preprocessors).
 #
-# katex_text_fix.py: copy assets/scripts/katex_text_fix.py from the teach skill
+# katex_text_fix.py: copy assets/scripts/katex_text_fix.py from the mdbook-authoring skill
 # into the book root (mdbook runs the command with cwd = the book dir). It must
 # exit 0 on `supports <renderer>` probes (it does) and keep `after = ["katex"]`:
 # mdbook 0.5 runs preprocessors alphabetically by config name (declaration order
@@ -35,7 +37,7 @@ assets_version = "3.1.0" # do not edit: managed by `mdbook-admonish install`
 # must run after admonish: admonish turns callout fences into HTML first,
 # otherwise mdbook-katex skips math inside them as code blocks.
 # Add `no-css = true` if you vendor katex.min.css + fonts yourself
-# (offline math — see MDBOOK.md gotchas) instead of the default CDN <link>.
+# (offline math — see SKILL.md gotchas) instead of the default CDN <link>.
 after = ["admonish"]
 
 # escapes _ and * in KaTeX html text nodes: katex emits raw span runs that

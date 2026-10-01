@@ -102,18 +102,27 @@ and may render a bare expression like `df`. Silence those rules for marimo files
 display cells), `PLR1711` useless return (marimo cells end with bare `return`).
 If the repo also has non-marimo modules, narrow the glob (e.g. `"notebooks/*.py"`).
 
-For editors, make numbered notebook files open as marimo notebooks via
-`.vscode/settings.json`:
+For editors, make notebook files open as marimo notebooks via
+`.vscode/settings.json`, and every other `.py` file open as plain Python —
+a bare notebook glob also swallows helper modules and figure-generation
+scripts that live in the same tree, which then silently fail to open as
+regular Python. List the narrower `"default"` overrides first, then the
+broader notebook glob last:
 
 ```json
 {
   "workbench.editorAssociations": {
-    "[0-9][0-9][0-9][0-9]_*.py": "marimo-notebook"
+    "**/mo/05_gradient.py": "default",
+    "**/mo/src/*.py": "default",
+    "**/mo/*.py": "marimo-notebook"
   }
 }
 ```
 
-Adjust the glob to the project's naming scheme.
+Adjust the globs to the project's naming scheme and notebook directory
+(`notebooks/`, `mo/`, numbered files, etc.): non-notebook `.py` paths get an
+explicit `"default"` entry whenever they'd otherwise fall inside the
+notebook glob, and the notebook glob itself always comes last.
 
 ## 3. Magic commands
 
