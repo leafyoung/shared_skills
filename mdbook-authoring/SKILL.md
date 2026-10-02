@@ -299,6 +299,7 @@ unless the user asks.
 | Citations | manual — no citeproc; link the resource and cite the resources page |
 
 ## Gotchas (all encountered in practice — do not rediscover them)
+- **SUMMARY parser silently drops a standalone link line followed by a list** (mdbook 0.5.4): a top-level link line immediately followed by an indented list can lose the link line without any build warning - author the SUMMARY in canonical nested-list form and verify the built book's page count against the SUMMARY entry count.
 
 - **`\_` in math**: mdbook-katex renders `\_` as a literal `_` character in
   its HTML output; mdBook's markdown parser then pairs those underscores into

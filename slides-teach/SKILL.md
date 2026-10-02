@@ -51,16 +51,15 @@ but doesn't state (citations, cited papers, published course materials). If
 the source has gaps — a deck that sketches what the lecture would have spoken
 — say so in the unit README and teach only what the source supports.
 
-**The text layer (and speaker notes) are first-class inputs to everything
-downstream** — not a byproduct of extraction. Lessons take their structure,
-derivations, and emphasis from the document's own order and its notes; the
-page text carries the precise wording of formulas and claims; notebooks
-implement what the document works through; the pages index captures what each
-page shows. Author from the text outward: read it end-to-end for the
-argument's shape before writing anything, then reconcile against the page
-images where they disagree — the image outranks the text layer on layout,
-figures, and rendered formulas; the text layer outranks the image on exact
-wording and numbers (OCR/selection is exact; visual reading is not).
+**The text layer (and speaker notes) are the narration layer here** -
+first-class inputs per teach's authoritative-index contract, not a byproduct
+of extraction: lessons take their structure, derivations, and emphasis from
+the document's own order and its notes, and the page text carries the precise
+wording of formulas and claims. Author from the text outward (teach's rule:
+end-to-end read before writing). This flavor's precedence tail: the image
+outranks the text layer on layout, figures, and rendered formulas; the text
+layer outranks the image on exact wording and numbers (OCR/selection is
+exact; visual reading is not).
 
 ## Unit pipeline
 
@@ -111,12 +110,11 @@ volume — blank/boilerplate pages stand out). Then:
 3. **PPTX speaker notes** (the narration intent): extract them per slide into
    `notes.md` with python-pptx (`slide.notes_slide.notes_text_frame.text`),
    one `## Slide K (pNNN)` section each. Empty file if the deck has none.
-4. Write `pages/README.md` — the **authoritative index**: source file +
-   provenance, page count, then one table row per kept page: file, on-page
-   title, a dense summary of every formula, claim, figure, and number on the
-   page (formulas as text, e.g. `M_t(n) = P_t − MA_t(n)`), verified against
-   the image, not skimmed. Note cross-references ("continues the table from
-   p7") in the header prose.
+4. Write `pages/README.md` — the **authoritative index**, per teach's
+   authoritative-index contract (one row per kept page: file, on-page title,
+   dense summary, formulas as text, verified against the image), plus this
+   flavor's header: source file + provenance and page count. Note
+   cross-references ("continues the table from p7") in the header prose.
 5. Delete `pages_raw/` once indexed. Keep the per-page text you actually used
    by pasting key passages into `pages/README.md` rows or `notes.md`.
 
@@ -143,9 +141,10 @@ rule is teach-marimo's).
 
 - **Page numbers as the join key** across page filenames, pages/README.md,
   notes.md, and lesson citations — cite `pNNN`, never "slide 12-ish".
-- **Formulas are transcribed as text** in the index; the page image outranks
-  the text layer on rendered formulas and layout; the text layer outranks the
-  image on exact wording and numbers.
+- **Formulas are transcribed as text** in the index (teach's
+  authoritative-index rule); this flavor's precedence tail: the page image
+  outranks the text layer on rendered formulas and layout, the text layer on
+  exact wording and numbers.
 - **Errata in the source** get teach-skill ERRATA tags at the point of use
   (teach "Mirrors, sync, and verification").
 - **New session in an existing course**: follow teach's resume order;

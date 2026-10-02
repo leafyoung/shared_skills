@@ -62,15 +62,13 @@ The video content itself is **ground truth**: never teach from parametric memory
 when a transcript or slide says otherwise. Web-search only for things the video
 implies but doesn't state (links, paper citations, published course materials).
 
-**The transcript is a first-class input to everything downstream** — not a
-byproduct of Step 2. Lessons take their structure, derivations, and emphasis
-from the spoken narrative (the lecturer's ordering, motivation, and emphasis
-are the course's pedagogy), joined to the slide record by timestamp; notebooks
-implement what the transcript works through; the slides index captures what
-each slide shows. Author from the transcript outward: read it end-to-end for
-the argument's shape before writing anything, then reconcile against the slide
-images where they disagree — the image outranks the spoken word on formulas
-and numbers, the transcript outranks the slide on reasoning and motivation.
+**The transcript is the narration layer here** - a first-class input per
+teach's authoritative-index contract, not a byproduct of Step 2: the
+lecturer's ordering, motivation, and emphasis are the course's pedagogy.
+Author from the transcript outward (teach's rule: end-to-end read before
+writing). This flavor's precedence tail: the image outranks the spoken word on
+formulas and numbers (ASR garbles exactly those), the transcript outranks the
+slide on reasoning and motivation.
 
 ## Episode pipeline
 
@@ -156,12 +154,12 @@ slide window, captured late in the window), a
    extract a missed frame manually with `ffmpeg -ss <t> -i video -frames:v 1`.
 2. Move keepers to `ep<N>_<slug>/slides/`, renamed `slideK_<slug>_<MmSSs>.png`
    (K = 1..count in first-appearance order; `MmSSs` = the capture timestamp).
-3. Write `slides/README.md` — the **authoritative index**: source video URL/title,
-   slide count, then one table row per slide: file, on-screen title, transcript
-   section (timestamp range), and a dense summary of every formula, claim, and
-   number on the slide. Formulas as text (`M_t(n) = P_t − MA_t(n)`), verified
-   against the image, not the transcript's spoken version. Note slide callbacks
-   (presenter flips back to an earlier slide) in the header prose, not as new slides.
+3. Write `slides/README.md` — the **authoritative index**, per teach's
+   authoritative-index contract (one row per slide: file, on-screen title,
+   dense summary, formulas as text, verified against the image), plus this
+   flavor's header (source video URL/title, slide count) and per-row transcript
+   section (timestamp range). Note slide callbacks (presenter flips back to an
+   earlier slide) in the header prose, not as new slides.
    The transcript-section column is **narration-aligned, not screen-window-aligned**:
    speakers routinely discuss a slide's content minutes before advancing to it (and
    this deck-lag is often heavier in the back half of a talk), so a section range
@@ -264,8 +262,9 @@ URL scrambles are easy to make and are caught only downstream.
 
 - **Timestamps as the join key** across slide filenames, slides/README.md, SRT, and
   lesson citations — never assume section headers line up 1:1 with slides.
-- **Formulas are transcribed as text** in transcripts and the slides index; the
-  slide image outranks the spoken formula when they disagree.
+- **Formulas are transcribed as text** in transcripts and the slides index
+  (teach's authoritative-index rule); this flavor's precedence tail: the slide
+  image outranks the spoken formula when they disagree.
 - **New session in an existing course**: follow teach's resume order;
   Step 1–3 end states are defined by the Phase A gate below, Steps 4–7 by the
   teach exit gate.

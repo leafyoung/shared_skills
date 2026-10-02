@@ -43,4 +43,13 @@ Write one when any of these is true:
 
 ## Supersession
 
+## Autonomous-run records
+
+When a course is authored without user contact (no interview, nothing graded),
+decision records are valid learning records: course-shape decisions, ground-truth
+findings about the study vehicle, conventions adopted. Tag them - for example
+`Status: no ZPD evidence yet` - so a later live session knows these records carry
+no user-performance evidence and probes the edge against the existing lessons
+before authoring new material.
+
 When a later record contradicts an earlier one (the user's understanding deepened or corrected), mark the old record `Status: superseded by LR-NNNN` rather than deleting it. The history of how understanding evolved is itself useful signal.
