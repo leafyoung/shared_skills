@@ -13,7 +13,8 @@ description: >-
   explicitly say "teach" — look for "walk me through", "can you show me how
   to", "I'd like to get into", etc. Also applies to quick explanations: apply
   the two teaching principles (see "How to Teach") so it locks in, without
-  spinning up a workspace.
+  spinning up a workspace. Companion marimo notebooks are the teach-marimo
+  skill's.
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -21,6 +22,20 @@ multi-session effort — a teaching workspace — the request is stateful: you
 maintain the mission, learning records, and the book across sessions. For
 quick one-off explanations, apply the two principles below and skip the
 workspace machinery.
+
+**Division of labour across the teaching skills.** This skill owns the
+pedagogy *and* the workspace: how to teach, how to plan, what to teach next,
+plus the workspace itself — layout, state documents, output formats, lessons
+in the book, resources, assets, verification bars and commit gates. Two
+satellites: **mdbook-authoring** (`~/.agents/skills/mdbook-authoring/`) owns
+the book mechanics — build every book with it. **teach-marimo**
+(`~/.agents/skills/teach-marimo/`) owns companion marimo notebooks — whether
+to build one, how, and how to verify it; call it up whenever a lesson or
+course calls for a notebook. The source pipelines **video-teach** and
+**slides-teach** turn raw material into a trustworthy index and then author
+their lessons through this skill. Anything about *how to teach* and *how the
+workspace is structured* lives here; book *mechanics* live in
+mdbook-authoring and *notebooks* in teach-marimo — never copy them in.
 
 ## How to Teach
 
@@ -43,39 +58,86 @@ Facts feel arbitrary when there's no visible reason they *had* to be that way, a
 
 **Socratic vs expository — choose per topic and per the user's energy.** Socratic (pose the motivating problem, let them attempt the discovery first) is stronger and the default when they can plausibly reason their way there. Expository (narrate the motivated path yourself) when the topic is beyond cold-reasoning reach or the user is low-energy.
 
+## Course parameters (fix once per workspace, record in NOTES)
+
+This skill serves tutoring workspaces and course workspaces built from source
+material. Fix the parameters at workspace creation:
+
+| Parameter | video course | slides/documents course | tutoring workspace |
+|---|---|---|---|
+| Unit folder | `epN_<slug>/` | `unitN_<slug>/` | none (flat) |
+| Join key | `MmSSs` timestamps | source page `pNNN` | - |
+| Authoring inputs | `slides/README.md` + corrected transcript | `pages/README.md` + text layer + `notes.md` | research |
+| Source gate | video-teach Phase A | slides-teach index review | - |
+| Extras | `MEDIA.md` + gitignored media cache; deck PDF pulled forward | `source/` committed; `notes.md` speaker notes | - |
+
+Everything below is written in terms of a **unit** - an episode, a unit, or a
+lesson batch in a tutoring workspace.
+
 ## Output Formats
 
-A teaching workspace authors its lessons in **one format — mdbook by default**. **Ask the user only to confirm when starting a new workspace** — unless they already named a format or explicitly want print-first lessons, do not push quarto. If they defer ("whatever", "you choose"), fall back to mdbook. Record the choice in `NOTES`; in an existing workspace, read it from `NOTES` or infer it from disk (`lessons_md*/` or `./mdbook/` → mdbook; `lessons/*.qmd` with no book dir → quarto) and don't re-ask.
+A teaching workspace authors its lessons in **one format — mdbook by default**. **Ask the user only to confirm when starting a new workspace** — unless they already named a format or explicitly want print-first lessons, do not push quarto. If they defer ("whatever", "you choose"), fall back to mdbook. Record the choice in `NOTES`; in an existing workspace, read it from `NOTES` or infer it from disk (`mdbook/` or `lessons_md*/` -> mdbook; `lessons/*.qmd` with no book dir -> quarto) and don't re-ask.
 
 - **mdbook (default)** — the whole course as a navigable, searchable web book (`book.toml` + `src/` + built `book/`). Best in practice: it is the format every active curriculum here converged on, the user browses it continuously, and a translated course is simply two mirror books under one convention.
 - **quarto** — per-lesson `./lessons/*.qmd` rendered to PDF via Typst. Reserve for genuinely print-first deliverables.
 
-**Where state documents live (decide once per workspace, never straddle).** Canonical in an mdBook workspace: MISSION/NOTES/RESOURCES/GLOSSARY/learning-records live **inside the book** as `src/*.md` (layout in [MDBOOK.md](./MDBOOK.md)). One exception is the **linkage route** — a workspace whose other artifacts (reference-doc PDFs, notebook headers) link into rendered root documents keeps GLOSSARY/MISSION/NOTES/RESOURCES as root Quarto docs, rendered from a root `_quarto.yml` that no longer lists lessons, with their lesson links pointing into the built book. A third sanctioned flavor is the **video-course workspace** (the video-teach skill): root `.qmd` state docs kept as editor-readable ledgers — deliberately never rendered, no root `_quarto.yml` — because the book's `about.md` carries the in-book summary. Pick one flavor, record it in `NOTES`, don't straddle: two living copies of a state document is how mirror drift happens.
+**Never maintain the same lessons in two formats.** Dual sources drift: retiring one curriculum's qmd lesson tree required a full normalized-diff audit of all twenty lesson pairs to prove nothing was lost (2026-09-26). If a workspace has both, convert (mdbook-authoring Route B), prove sync, retire the qmd lessons, and record the retirement in `NOTES`.
 
-**Never maintain the same lessons in two formats.** Dual sources drift: retiring one curriculum's qmd lesson tree required a full normalized-diff audit of all twenty lesson pairs to prove nothing was lost (2026-09-26). All three curricula in `argus-teach` have since retired their qmd lesson trees; Quarto survives only for print-first courses and, on the linkage route, the root reference docs. If a workspace has both, convert (Route B), prove sync, retire the qmd lessons, and record the retirement in `NOTES`.
+**State-doc flavor - decide once, never straddle.** Canonical in an mdBook workspace: MISSION/NOTES/RESOURCES/GLOSSARY/learning-records live **inside the book** as `src/*.md` (canonical layout: [MDBOOK.md](./MDBOOK.md)). Two sanctioned exceptions: the **linkage route** (artifacts link into rendered root documents, so state docs stay root Quarto docs rendered from a root `_quarto.yml` that no longer lists lessons) and the **ledger flavor** used by video and slides courses (root `.qmd` state docs kept as editor-readable ledgers - deliberately never rendered, no root `_quarto.yml` - because the book's `about.md` carries the in-book summary). Two living copies of a state document is how mirror drift happens.
 
-The teaching rules are identical under both; only the authoring format and build differ. All mdBook mechanics — the pinned toolchain (mdbook + admonish + katex + mermaid — exact versions matter), **Route A: create an mdBook from scratch**, **Route B: convert an existing qmd course** (with the construct-by-construct mapping), and the style to use for each content type (callouts, math, diagrams, captioned figures, cross-references, …) — live in the shared **mdbook-authoring** skill (`~/.agents/skills/mdbook-authoring/`, also used by video-teach and slides-teach). [MDBOOK.md](./MDBOOK.md) keeps only teach's flavor deltas: the state-doc layout, route couplings, and the qmd-retirement policy.
+The teaching rules are identical under both formats; only the authoring format and build differ. All mdBook mechanics - the pinned toolchain, Route A (create from scratch), Route B (convert a qmd course), and the per-content-type style - live in the shared **mdbook-authoring** skill. [MDBOOK.md](./MDBOOK.md) keeps this skill's flavor deltas: the state-doc layout, route couplings, and the qmd-retirement policy.
 
 ## First session
 
-1. **Probe.** If no mission document exists yet (`MISSION.qmd` in a Quarto workspace, `mission.md` in the book's `src/`), interview the user on why they want to learn this (`ask_user_question`) — interrogate the goal until it's concrete. Write it before authoring any teaching content (scaffold the directory shell first if the document lives inside the book). Also probe their current level: bracket the edge of what they know (see [Zone Of Proximal Development](#zone-of-proximal-development)). In the same question round, **confirm the output format** (mdbook by default; quarto only for print-first — see [Output Formats](#output-formats)) unless the user already specified one, and record the answer in `NOTES` before authoring content (in the default mdBook flavor that means scaffolding the book's `src/` shell first — `NOTES` lives inside it).
-2. **Plan.** Scope the field from research, never from memory alone. Present the plan in chat before any teaching: the approach in prose, plus a small mermaid dependency map — unconditional truths at the roots, each node hanging off what it depends on, the user's goal as the sink. Stress-test the roots: if a "foundational" node itself derives from something simpler the user would accept at face value, push it down. Then stop and wait for the user's go-ahead before authoring (resource *acquisition* may run during planning; authoring waits). Search for high-trust sources (books, articles, courses, communities) and populate `RESOURCES` (`RESOURCES.qmd`, or `resources.md` in the book's `src/`). Every entry is downloaded on the spot (see [Knowledge](#knowledge) — Acquisition): a `RESOURCES` entry without a local copy or an explicit streaming-only/paywalled note is not fully acquired.
-3. **Build one lesson.** Format per [Output Formats](#output-formats). mdBook (default): scaffold the book from the mdbook-authoring skill's bundled template (`~/.agents/skills/mdbook-authoring/assets/book.toml`) and follow that skill's **Route A** — or **Route B** if the workspace already has `.qmd` lessons to convert. Quarto (print-first only): create a single self-contained lesson in `./lessons/0001-...qmd` (rendered to PDF via Typst) tied to the mission; ensure the workspace has a `_quarto.yml` at its root, bootstrapped from the skill's bundled template [`assets/_quarto.yml`](./assets/_quarto.yml) — this is the shared styling every lesson inherits.
+1. **Probe.** If no mission document exists yet, interview the user on why they want to learn this (`ask_user_question`) — interrogate the goal until it's concrete. Write it before authoring any teaching content (format: [MISSION-FORMAT.md](./MISSION-FORMAT.md); scaffold the directory shell first if the document lives inside the book). Also probe their current level: bracket the edge of what they know (see [Zone Of Proximal Development](#zone-of-proximal-development)). In the same question round, **confirm the output format** (see [Output Formats](#output-formats)) unless the user already specified one, and record the answer in `NOTES` before authoring content.
+2. **Plan.** Scope the field from research, never from memory alone. Present the plan in chat before any teaching: the approach in prose, plus a small mermaid dependency map — unconditional truths at the roots, each node hanging off what it depends on, the user's goal as the sink. Stress-test the roots: if a "foundational" node itself derives from something simpler the user would accept at face value, push it down. Then stop and wait for the user's go-ahead before authoring (resource *acquisition* may run during planning; authoring waits). Search for high-trust sources (books, articles, courses, communities) and populate `RESOURCES` — every entry is downloaded on the spot (see [Resources](#resources-download-on-the-spot)).
+3. **Build one lesson.** mdbook (default): scaffold the book from the mdbook-authoring skill's bundled template and follow its Route A. Quarto (print-first only): create a single self-contained lesson in `./lessons/0001-...qmd` rendered to PDF via Typst, with the workspace `_quarto.yml` bootstrapped from the bundled template [`assets/_quarto.yml`](./assets/_quarto.yml).
 4. **Record.** Write a learning record if the user demonstrated understanding or disclosed prior knowledge.
 
-Future sessions: read `learning-records/` and `NOTES` (`NOTES.md` in the book's `src/`, or `NOTES.qmd` in a Quarto workspace) to pick the next thing in their zone of proximal development.
+Future sessions: read `learning-records/` and `NOTES` to pick the next thing in their zone of proximal development.
 
-## Teaching Workspace
+## Workspace Layout
 
-Treat the current directory as a teaching workspace. The state of their learning is captured in this directory in several files (paths below are the Quarto flavor; in the mdBook default everything lives inside the book's `src/` with `.md` extensions — `mission.md`, `reference/`, `resources.md`, `NOTES.md`, `lessons/` — per the canonical layout in [MDBOOK.md](./MDBOOK.md). The book dir may sit at the workspace root under a name like `lessons_md/`, and a translated course is one book per language (`lessons_md/`, `lessons_md_zh/`) kept as full mirrors, with shared state documents maintained **once**, in the primary-language book — see [MDBOOK.md](./MDBOOK.md) and [Output Formats](#output-formats) for the linkage exception):
+**Tutoring workspace** (flat):
 
-- `MISSION.qmd`: A document capturing the _reason_ the user is interested in the topic. This should be used to ground all teaching. Use the format in [MISSION-FORMAT.md](./MISSION-FORMAT.md).
-- `./reference/*.qmd`: Reference materials (Quarto/Typst) — compressed cheat sheets, algorithms, syntax references, glossaries. Designed for quick reference and printing. `GLOSSARY.qmd` at workspace root tracks canonical terminology and cross-references these files (format: [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md)).
-- `RESOURCES.qmd`: A list of resources which can be explored to ground your teaching in contextual knowledge, or to acquire knowledge and wisdom. Use the format in [RESOURCES-FORMAT.md](./RESOURCES-FORMAT.md).
-- `./learning-records/*.md`: A directory of learning records, which capture what the user has learned. These are loosely equivalent to architectural decision records in software development - they capture non-obvious lessons and key insights that may need to be revised later, or drive future sessions. These should be used to calculate the zone of proximal development. They are titled `0001-<dash-case-name>.md`, where the number increments each time. Use the format in [LEARNING-RECORD-FORMAT.md](./LEARNING-RECORD-FORMAT.md).
-- `./lessons/` — a directory of lessons. A **lesson** is a single, self-contained document that teaches one tightly-scoped thing tied to the mission. This is the primary unit of teaching in this workspace. Quarto format: `lessons/*.qmd` rendered to PDF via Typst. mdBook format: `<book-dir>/src/lessons/*.md` built into the course book (see [MDBOOK.md](./MDBOOK.md)).
-- `./assets/*`: Reusable **components** shared across lessons (Typst template partials, reusable markdown includes, diagram helpers). See [Assets](#assets).
-- `NOTES.qmd`: A Quarto scratchpad for you to jot down user preferences, or working notes. Give it a `title` header so it renders like the rest.
+- `MISSION.qmd` - the reason the user is learning this ([MISSION-FORMAT.md](./MISSION-FORMAT.md)); mdBook flavor: `<book-dir>/src/mission.md`.
+- `RESOURCES.qmd` - the acquisition ledger ([RESOURCES-FORMAT.md](./RESOURCES-FORMAT.md)); mdBook: `src/resources.md`.
+- `GLOSSARY.qmd` - canonical terminology ([GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md)); mdBook: `src/glossary.md`.
+- `./learning-records/*.md` - what the user has learned, `0001-<name>.md`, incrementing ([LEARNING-RECORD-FORMAT.md](./LEARNING-RECORD-FORMAT.md)); mdBook: `<book-dir>/src/learning-records/`.
+- `./lessons/` - the lessons; `./assets/` - reusable components; `NOTES.qmd` - preferences and working notes (mdBook: `src/NOTES.md`).
+
+**Course workspace** (one git repo, one `uv` project, one folder per unit):
+
+```
+<course>/
+├── AGENTS.md              # how to work here: layout + conventions (adapt on init)
+├── MISSION.qmd            # root, canonical (ledger flavor - never rendered)
+├── RESOURCES.qmd          # acquisition ledger (root; snapshots live per-unit)
+├── NOTES.qmd              # scratchpad (root, canonical)
+├── pyproject.toml         # ONE uv project for the whole course
+├── .python-version        # 3.12 unless the course needs otherwise
+├── .gitignore             # mdbook/book/, output/, __pycache__, caches (+ video: media, transcript intermediates)
+├── mdbook/                # the course book (mdbook-authoring Route A scaffold)
+│   ├── src/SUMMARY.md     #   one Part per unit; every file listed or it won't render
+│   ├── src/about.md       #   course overview + progress table (the resume anchor;
+│   │                      #   NOT mission.md - root MISSION.qmd is canonical)
+│   ├── src/unitN-<slug>/  #   unit overview chapter + lessons/*.md
+│   ├── src/reference/     #   cross-unit cheat sheets (glossary.md first)
+│   └── src/assets/unitN/  #   copies of figures embedded in lessons (source in unitN/assets/)
+└── <unit>N_<slug>/        # one folder per unit - everything else is per-unit
+    ├── README.md          # provenance, index summary, what's built, open gaps
+    ├── notebooks/<slug>.py    # marimo companion notebook(s), per teach-marimo
+    ├── resources/         # downloaded PDFs; web snapshots as resources/web/*.qmd
+    ├── assets/            # lesson figure generation scripts + rendered images
+    ├── output/            # marimo export artifacts (gitignored)
+    └── learning-records/  # per-unit ZPD findings
+```
+
+plus the flavor's source artifacts (video: `transcript/`, `slides/`, `MEDIA.md` - see video-teach; slides: `source/`, `pages/`, `notes.md` - see slides-teach).
+
+**Placement is not negotiable**: only `AGENTS.md`, the root state docs, `pyproject.toml`, `.python-version`, `.gitignore` (and the flavor's root extras: `MEDIA.md` for video) are root-level; everything else lives in the unit folder.
+
+**Python code.** One root `pyproject.toml`, no per-unit files; add a dependency once at the root when any unit needs it (marimo - pin the version - pillow, pytest, ruff, plus format-specific extras). Notebook preference, editor wiring, and notebook verification are the **teach-marimo** skill's.
 
 ## Philosophy
 
@@ -85,7 +147,7 @@ To learn at a deep level, the user needs three things:
 - **Skills**, acquired through highly-relevant interactive lessons devised by you, based on the knowledge
 - **Wisdom**, which comes from interacting with other learners and practitioners
 
-Before the `RESOURCES.qmd` is well-populated, your focus should be to find high-quality resources which will help the user acquire knowledge. Never trust your parametric knowledge. The moment you are even slightly unsure of any fact, name, date, formula, or definition, stop and verify (web search or a researcher subagent) before saying it — one confidently-delivered hallucination poisons the trust everything else rests on. If a check corrects what you were about to teach, say so plainly.
+Before `RESOURCES` is well-populated, your focus should be to find high-quality resources which will help the user acquire knowledge. Never trust your parametric knowledge. The moment you are even slightly unsure of any fact, name, date, formula, or definition, stop and verify (web search or a researcher subagent) before saying it — one confidently-delivered hallucination poisons the trust everything else rests on. If a check corrects what you were about to teach, say so plainly.
 
 Some topics may require more skills than knowledge. Learning more about theoretical physics might be more knowledge-based. For yoga, more skills-based.
 
@@ -104,19 +166,15 @@ Fluency can give the user an illusory sense of mastery, but storage strength is 
 
 ## Lessons
 
-A lesson is the main thing you produce — the unit in which knowledge and skills reach the user. Each lesson is one self-contained document in the workspace's chosen format (see [Output Formats](#output-formats)), saved under the lessons directory (Quarto: `lessons/0001-<dash-case-name>.qmd`; mdBook: `<book-dir>/src/lessons/`) where the number increments each time. Quarto lessons carry a minimal YAML header (a `title` is enough) and inherit everything else from the workspace `_quarto.yml`; the body is markdown rendered to PDF by Typst. mdBook lessons are plain markdown chapters (H1 title, no front matter) registered in `src/SUMMARY.md`.
+A lesson is the main thing you produce — the unit in which knowledge and skills reach the user. Each lesson is one self-contained document teaching one tightly-scoped thing tied to the mission, saved under the workspace's lessons directory (Quarto: `lessons/0001-<dash-case-name>.qmd`; mdBook: `<book-dir>/src/lessons/`) where the number increments each time.
 
-**Mirrors, sync, and verification.** A translated course is two full mirror books: every lesson change lands in all languages *and* the companion notebooks in the same session — never "I'll translate it later". Shared state (mission, NOTES, RESOURCES, learning-records) is maintained **once**, in the primary-language book; the mirror carries only translated teaching content. Sync is proven, not assumed: normalized-diff the language pairs after stripping the known per-format differences (frontmatter vs H1, figure syntax, escaped `\$`, path depth, tag forms) — use [`assets/scripts/normalized_diff.py`](./assets/scripts/normalized_diff.py), don't hand-roll the stripping: `--digest` proves the structural lockstep (heading levels, figures, tags, math, tables — the proof for language mirrors, since every word legitimately differs), the default full-text diff is for same-language checks (qmd → mdBook). Figure convention: the Chinese variant of a figure is `name-zh.svg` beside the English original (the normalizer strips the suffix when pairing trees); errata caveat wording follows the book's language (a 修正 note is fully Chinese, caveat included). The verification bar for any session that touched lessons or notebooks: `ruff` + `marimo check` on each touched notebook, then the execution bar — `marimo export html` (it runs every cell and fails loudly) in ordinary workspaces, or the video-teach skill's `run_marimo_notebook.py` in video-course workspaces (it injects `mo` explicitly; headless export can silently skip that injection), `mdbook build` per book with zero warnings, `quarto render` only for the root reference docs. If other artifacts link into the built `book/` (reference-doc PDFs, notebook headers), commit the rebuilt output as part of the change — where the book output is tracked (linkage commits its `book/`; neg-bal-abuse gitignores both books'; gitignored books just rebuild).
-
-**Errata discipline.** A defect found in a source spec or resource is folded into the lesson at the exact point the wrong figure appears — a red **ERRATA** (English book) / **修正** (Chinese book) tag, then the note, always preserving the caveat "flagged, not yet confirmed with the source's owner". No standalone root-level errata source: that was tried and deleted in both curricula that had one (2026-09-26) — an entry at point-of-use is what survives review, and it stops the bad figure being restated as authoritative. A per-book `errata.md` ledger page inside each book's `src/` is fine (neg-bal-abuse keeps one) — maintained directly in the books, never mirrored from a root document.
-
-A lesson should be **beautiful** — clean, readable typography and layout — since the user will return to these later to review. Think Tufte, in the medium the reader actually gets: lean on the book template's shared defaults (mdBook's `book.toml` + CSS, Quarto's `_quarto.yml`) rather than restyling each lesson.
+A lesson should be **beautiful** — clean, readable typography and layout — since the user will return to these later to review. Think Tufte, in the medium the reader actually gets: lean on the shared template defaults rather than restyling each lesson.
 
 The lesson should be short, and completable very quickly. Learners' working memory is very small, and we need to stay within it. But each lesson should give the user a single tangible win that they can build on. It should be directly tied to the mission, and should be in the user's zone of proximal development.
 
-If possible, build and open the lesson for the user by running a CLI command. mdBook: `mdbook build <book-dir>` then open `<book-dir>/book/index.html`, or `mdbook serve <book-dir>` for a live-reloading preview at `localhost:3000` — binaries live in `~/.cargo/bin` (toolchain pinning: mdbook-authoring skill). Quarto: `quarto render ./lessons/0001-....qmd`, then open the resulting PDF (`open` on macOS, `xdg-open` on Linux) — requires the `quarto` CLI.
+If possible, build and open the lesson for the user by running a CLI command (mdBook: `mdbook build` + open, or `mdbook serve` for a live-reloading preview; Quarto: `quarto render` + open the PDF).
 
-Each lesson should link via standard markdown links to other lessons and reference documents (mdBook: relative paths within `src/`; Quarto resolves these across the project).
+Each lesson should link via standard markdown links to other lessons and reference documents.
 
 Each lesson should recommend a primary source for the user to read or watch. This should be the most high-quality, high-trust resource you found on the topic.
 
@@ -129,27 +187,27 @@ Structure each concept in a lesson as a **node** in the dependency map, and teac
 3. **Connect** — make the dependency edge explicit: show how this node hangs off what's already established, so it's understood, not memorized.
 4. **Check** — confirm the node landed (exercise or in-chat question) before building anything on it. An unconfirmed foundation is exactly as dangerous as an unconfirmed derived fact. Any mid-lesson unconditional truth goes through the same loop.
 
-Math renders as LaTeX in both formats — write `$f(x) = x^2$`, never plain-text approximations. If LaTeX can be used, it should be. (Quarto renders it via Typst; mdBook via KaTeX — plain LaTeX in both, never Typst-native math syntax.) In mdBook, KaTeX pins `\tag` at the right margin without reflowing content, so a display equation too wide for the column is silently overlapped by its own tag — keep tagged equations narrow (one tag per source equation; `aligned`-break long ones) — full gotcha list in the mdbook-authoring skill.
+Math renders as LaTeX — write `$f(x) = x^2$`, never plain-text approximations. If LaTeX can be used, it should be. (Rendering mechanics and per-format gotchas: mdbook-authoring.) Figures are regenerable components, not one-offs — see [Assets](#assets).
 
-Diagrams: use the `mermaid-maker` subagent for relational diagrams (flowcharts, dependency graphs) and `svg-maker` for spatial/geometric figures (function plots, vectors, number lines, layouts) — embed the resulting figure in the lesson (mermaid output embeds directly as a ` ```mermaid ` block under mdBook; in a Quarto lesson use a ` ```{mermaid} ` chunk, no `%%|` options). If neither subagent is available, hand-build the figure (raw SVG, or a small matplotlib/plotting script) — but never as a one-off: see [Assets](#assets) below, every figure's generation code is a first-class, saved component, not scratch work.
+## Lessons in the book
 
-## Assets
+Author per the teaching rules above - this section is only about where lessons land and what they must contain in a course workspace.
 
-Lessons are built from reusable **components**, stored in `./assets/`: Typst template partials, reusable markdown includes, diagram helpers, code snippets — anything a second lesson could reuse.
-
-Reuse is the default, not the exception. Before authoring a lesson, read `./assets/` and build from the components already there. When a lesson needs something new and reusable, write it as a component in `./assets/` and reference it — never inline content a future lesson would duplicate.
-
-**Every figure is regenerable, not just embeddable.** When a lesson figure is produced by code (a hand-built SVG, a matplotlib/plotting script — anything that isn't a static export from `mermaid-maker`/`svg-maker`), save the generation script itself into `./assets/` alongside the rendered image, named to match (`lessonNNNN-topic.py` generating `lessonNNNN-topic.svg`/`.png`). The script must run standalone from the workspace root with a one-line invocation (document it in a short module docstring), and must regenerate the exact figure already embedded — a figure with no saved script is a dead end the moment a number in the lesson needs to change. This is why the image is a build artifact of the script, not the other way around: edit the script and re-run it, don't hand-patch the image.
-
-A shared `_quarto.yml` at the workspace root is the first component every Quarto workspace earns, bootstrapped from the skill's bundled template [`assets/_quarto.yml`](./assets/_quarto.yml). It sets the Typst `format` defaults — page, margins, fonts, accent colour — so every lesson renders as one consistent course rather than a pile of one-offs. mdBook workspaces earn the equivalent: the mdbook-authoring skill's bundled `assets/book.toml` (callouts, KaTeX math and the text-fix preprocessor pre-wired — see that skill's gotchas). As the workspace grows, so should the component library.
-
-Figure scripts earn the same treatment: bootstrap `assets/scripts/svgutil.py` from [`assets/scripts/svgutil.py`](./assets/scripts/svgutil.py) into any workspace that hand-builds SVG figures, rather than re-typing `line`/`rect`/`text`/`circle`/`polyline`/`write_svg` tag-formatting per script. It includes `FONT_EN`/`FONT_ZH` and `lang_from_argv()` for a script that renders both an English and a Chinese label variant from one file (`python3 scriptname.py zh`). Copy it in once per workspace (not a cross-project import) so each course stays self-contained. (The bundled copy's `FONT_ZH` note is a starting point — re-verify CJK font availability on each new workstation.)
+- Content comes from the unit's authoritative index and narration layer (see [Course parameters](#course-parameters-fix-once-per-workspace-record-in-notes)). The source tells you *what to teach and in what order*; the teach rules tell you *how*.
+- Lesson language: the course's language - the user's stated preference, else the source's. Mirror books apply only when the user explicitly requests a translated course (see [Mirrors, sync, and verification](#mirrors-sync-and-verification)).
+- 2-4 lessons per lecture hour (video) or per 30-40 content pages (slides), each tightly-scoped, self-contained, with a single tangible win and its `## Exercises`/`## Answers` sections. A lesson with unanswered exercises must not ship.
+- Retrofit (absorbing pre-existing lessons): normalize their exercise headings to the book's convention (`## Exercises` / `## Answers`) and bring each chapter to the same bar - a numerical, chapter-computable exercise where the existing mix is conceptual-only.
+- Book structure: one Part per unit in `SUMMARY.md`; each Part opens with a unit overview chapter (what the source covers, link to the original, links to its notebook and resources) followed by the lessons. Add each chapter to `SUMMARY.md` in the same edit that creates it.
+- Cite the source: video courses link the video with a timestamp (`https://youtu.be/<id>?t=<s>`) plus the local transcript section; slides courses cite the page ("source p.12") with a relative link to the kept page image in `mdbook/src/assets/unitN/` and the `pages/README.md` row.
+- Figures are regenerable - generation script in `<unit>/assets/lessonNNNN-<topic>.py`, rendered image beside it, **copy** the image into `mdbook/src/assets/unitN/` for embedding (re-copy after regenerating).
+- Source images may be embedded where the source IS the content (a key formula, a result table): copy into `mdbook/src/assets/unitN/` likewise, and keep a conservative copyright posture - brief excerpts for personal study are fine, wholesale re-publication is not. An asset copied into `mdbook/src/assets/` must be embedded by a lesson in the same session - an unreferenced copy is dead weight that reads as already-used, and no build warning will flag it.
+- Build bar: `mdbook build` with zero warnings; math via KaTeX, callouts via admonish, per the mdbook-authoring skill's style table and gotchas (escape literal `$`, wire the text-fix preprocessor, no `README.md` in src/).
 
 ## The Mission
 
 Every lesson should be tied into the mission - the reason that the user is interested in learning about the topic.
 
-If the user is unclear about the mission, or the mission document (`MISSION.qmd` / `mission.md`) is not populated, your first job should be to question the user on why they want to learn this.
+If the user is unclear about the mission, or the mission document is not populated, your first job should be to question the user on why they want to learn this.
 
 Failing to understand the mission will mean knowledge acquisition is not grounded in real-world goals. Lessons will feel too abstract. You will have no way of judging what the user should do next.
 
@@ -177,22 +235,25 @@ The user may specify an exact thing they want to learn. If they don't, figure ou
 
 Lessons should be designed around a skill the user is going to learn. The knowledge in the lesson should be only what's required to acquire that skill. You teach the knowledge first, then get the user to practice the skills via an interactive feedback loop.
 
-Knowledge should first be gathered from trusted resources. Use `RESOURCES.qmd` to keep track of them. Lessons should be littered with citations - links to external resources to back up any claim made. This increases the trustworthiness of the lesson.
+Knowledge should first be gathered from trusted resources. Use `RESOURCES` to keep track of them. Lessons should be littered with citations - links to external resources to back up any claim made. This increases the trustworthiness of the lesson.
 
-If web search does not work (errors, timeouts, empty, or spam results), **notify the user immediately** — do not silently fall back to parametric knowledge or pretend sources were verified. State what failed, mark affected resources as unverified in `RESOURCES.qmd`, and retry when search is available again.
-
-### Acquisition: download every resource, immediately
-
-Every resource added to `RESOURCES.qmd` is **downloaded into the workspace at the moment it is added** — all of them, not only the ones the current lesson cites. `RESOURCES.qmd` is an acquisition ledger, not a bookmark list: an entry without a local copy is unfinished. Record the local path in `RESOURCES.qmd`. Lessons must not depend on external links staying alive:
-
-- **PDFs, datasets, slides, code archives** — save verbatim into `resources/`.
-- **Web pages** — snapshot to a local `.qmd` under `resources/web/` (mdBook workspaces: `.md`): a YAML `title`, a provenance blockquote (source URL, fetch date, license/© note), then the page's content converted to markdown. Trim site navigation, keep the substance.
-- **Paywalled or unobtainable full texts** — say so plainly in `RESOURCES.qmd`; snapshot the abstract/landing page as a `.qmd`, and hunt an open-access substitute (author mirrors, `.edu` lecture notes, working-paper repositories, the Wayback Machine) rather than relying on the dead link.
-- **Streaming or interactive media** (video lectures, courses, forums) — don't mass-download video; snapshot the landing page as a `.qmd` under `resources/web/`, mark the entry *streaming-only* in `RESOURCES.qmd`, and note the offline substitute where one exists (e.g. the same course's textbook as a PDF).
-
-Before finishing any session that touched `RESOURCES.qmd`, re-scan it: every entry carries a local path or an explicit streaming-only/paywalled note. Fix the gaps while you're still in the session.
+If web search does not work (errors, timeouts, empty, or spam results), **notify the user immediately** — do not silently fall back to parametric knowledge or pretend sources were verified. State what failed, mark affected resources as unverified in `RESOURCES`, and retry when search is available again.
 
 For acquiring knowledge, difficulty is the enemy. It eats working memory you need for understanding.
+
+## Resources (download on the spot)
+
+`RESOURCES` is the ledger; **every entry is acquired the moment it's added** — all of them, not only the ones the current lesson cites. It is an acquisition ledger, not a bookmark list: an entry without a local copy is unfinished. Record the local path in the ledger. Lessons must not depend on external links staying alive. In a course workspace acquisition means:
+
+- Papers / references / slides / cited works -> PDF verbatim into `<unit>/resources/`. **Verify every fetched PDF**: page count + text extraction (`pdfinfo`/`pdftotext`), and prefer the largest of N archive captures - a truncated download parses as a valid PDF header but is worse than no local copy (seen in practice: a Wayback capture complete only to ~half its size). A truncated PDF must not be kept.
+- Web pages (course site, docs, project pages) -> snapshot to `<unit>/resources/web/<slug>.qmd`: YAML `title`, a provenance blockquote (source URL, fetch date, license note), then the content as markdown (tutoring workspaces: under `resources/web/` likewise; mdBook flavor: `.md`).
+- Paywalled or unobtainable full texts -> say so plainly in the ledger; snapshot the abstract/landing page, and hunt an open-access substitute (author mirrors, `.edu` lecture notes, working-paper repositories, the Wayback Machine) rather than relying on the dead link.
+- Streaming or interactive media -> don't mass-download video; snapshot the landing page, mark the entry *streaming-only*, and note the offline substitute where one exists. In a video course the episode video is such an entry: *streaming* + the local cache path from `MEDIA.md` (never commit video). The course's own source document (slides courses) enters marked *in-repo*, pointing at `<unit>/source/`.
+- Find the official materials first (the course's or deck's own published materials beat any third-party summary); record and cite them from the unit's lessons.
+
+Before finishing any session: every ledger entry has a local path or an explicit streaming-only/paywalled note. Fix the gaps while you're still in the session.
+
+Downloaded papers are copyrighted third-party material - **gitignore `<unit>/resources/*.pdf`** so the tracked `resources/web/*.qmd` snapshots carry the record while the binaries stay local.
 
 ## Skills
 
@@ -207,7 +268,7 @@ Each of these should be based on a **feedback loop**. Because the output is stat
 
 **Answers are not optional.** Every exercise printed in a lesson — multiple-choice, fill-in-the-blank, short prompt, real-world task — must have its answer or expected outcome (rubric) printed in the same lesson file, under the "Answers" heading. A lesson rendered with an unanswered exercise is incomplete and must not ship. (2026-09-15: lesson 0001 shipped with unanswered Skills questions and the user had to ask for the key — the exact failure mode this rule prevents.)
 
-**Notebook preference:** the user prefers **marimo** notebooks over Jupyter for lesson-created notebooks and exercises (reactive cells, no hidden state, stored as plain Python — see marimo.new); record the preference in each new workspace's `NOTES`. In an existing Jupyter-based workspace, engage with its notebooks as they are — don't convert wholesale unless asked. Wire the workspace's `.vscode/settings.json` so notebook files open in the marimo editor and every other `.py` file (figure/asset scripts, helper modules) keeps the default Python editor — see the `ipynb-to-marimo` skill's `workbench.editorAssociations` pattern (narrower `"default"` overrides first, the notebook glob last).
+**Notebook preference:** the user prefers **marimo** notebooks over Jupyter for lesson-created notebooks and exercises; whether to build one, how, and how to verify it are the **teach-marimo** skill's.
 
 For printed multiple-choice questions (and in-chat options), construct the set so evenness is automatic — don't audit after the fact:
 
@@ -217,6 +278,50 @@ For printed multiple-choice questions (and in-chat options), construct the set s
 - No asymmetric bolding, and keep options near the same length (and characters, if possible).
 
 If you can tell which option is right without knowing the material, regenerate — don't patch.
+
+## Assets
+
+Lessons are built from reusable **components**, stored in `<unit>/assets/` (or `./assets/` in a tutoring workspace): Typst template partials, reusable markdown includes, diagram helpers, code snippets — anything a second lesson could reuse.
+
+Reuse is the default, not the exception. Before authoring a lesson, read `./assets/` and build from the components already there. When a lesson needs something new and reusable, write it as a component and reference it — never inline content a future lesson would duplicate.
+
+**Every figure is regenerable, not just embeddable.** When a figure is produced by code, save the generation script itself, named to match (`lessonNNNN-topic.py` -> `lessonNNNN-topic.svg`/`.png`), runnable standalone from the workspace root with a one-line invocation (document it in a module docstring), regenerating the exact embedded figure. A figure with no saved script is a dead end the moment a number in the lesson needs to change. Edit the script and re-run; never hand-patch the image.
+
+Bootstrap shared helpers once per workspace rather than re-typing them: the mdbook-authoring skill's bundled `assets/book.toml` (callouts, KaTeX, text-fix preprocessor pre-wired), this skill's bundled [`assets/_quarto.yml`](./assets/_quarto.yml) for print-first Quarto workspaces, and [`assets/scripts/svgutil.py`](./assets/scripts/svgutil.py) for hand-built SVG figures (includes `FONT_EN`/`FONT_ZH` and `lang_from_argv()` for dual-language variants; copy it in once per workspace, and re-verify CJK font availability per workstation).
+
+Diagrams: use the `mermaid-maker` subagent for relational diagrams and `svg-maker` for spatial/geometric figures; embed the result (```` ```mermaid ```` block under mdBook, ```` ```{mermaid} ```` chunk in Quarto). If neither subagent is available, hand-build per the figure-script rule above.
+
+## Mirrors, sync, and verification
+
+A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): every lesson change lands in all languages *and* the companion notebooks in the same session - never "I'll translate it later". Shared state (mission, NOTES, RESOURCES, learning-records) is maintained **once**, in the primary-language book; the mirror carries only translated teaching content. Sync is proven, not assumed: normalized-diff the language pairs after stripping the known per-format differences - use [`assets/scripts/normalized_diff.py`](./assets/scripts/normalized_diff.py), don't hand-roll the stripping: `--digest` proves the structural lockstep (the proof for language mirrors, since every word legitimately differs), the default full-text diff is for same-language conversions (qmd -> mdBook). Figure convention: the Chinese variant of a figure is `name-zh.svg` beside the English original; errata caveat wording follows the book's language.
+
+**Errata discipline.** A defect found in a source is folded into the lesson at the exact point the wrong figure appears - a red **ERRATA** (English book) / **修正** (Chinese book) tag, then the note, always preserving the caveat "flagged, not yet confirmed with the source's owner". No standalone root-level errata source (tried and deleted 2026-09-26); a per-book `errata.md` ledger page inside `src/` is fine, maintained directly in the book.
+
+**The verification bar for any session that touched lessons or notebooks**: `ruff` + `marimo check` on each touched notebook, then the notebook execution bar per **teach-marimo**; `mdbook build` per book with zero warnings; `quarto render` only for root reference docs. If other artifacts link into the built `book/` (reference-doc PDFs, notebook headers), commit the rebuilt output as part of the change - where the book output is tracked, linkage commits its `book/`; gitignored books just rebuild.
+
+## Wrap and the exit gate
+
+1. `<unit>/README.md`: source provenance (origin, date, version; video link + duration for episodes), the index summary, what was built (lessons, notebook, resources), open gaps.
+2. Learning records when the session surfaced something non-obvious (a ZPD finding, a convention decision, a bug or erratum in the source material).
+3. Update root `RESOURCES` / `NOTES`; bump the unit's row in the book's `about.md` progress table (keep this table - it is the resume anchor).
+4. Commit at unit boundaries (`unit3: pages indexed, 2 lessons, notebook`); on a long unit, commit at pipeline-step boundaries too - never leave hours of transcript/extraction work uncommitted.
+
+**Exit gate - all items before the unit commit:**
+
+- [ ] book: new chapters in `SUMMARY.md` (added in the same edit that creates them); `mdbook build` zero warnings; exercises all answered
+- [ ] lessons cite the source layers per the course's join key; every figure or source image copied into `mdbook/src/assets/` is embedded by a lesson
+- [ ] notebooks (where this course builds them - teach-marimo's when-to-build rule): the teach-marimo verifier exits 0; linked from the unit's book chapters
+- [ ] resources: every ledger entry added this session has a local path or a streaming-only note
+- [ ] unit README current (including open gaps); commit(s) for the unit
+
+Source pipelines add their own gates before this one (video-teach's Phase A handover gate runs when the unit's data phase completes; the pipeline's own checklist defines each upstream step's end state).
+
+## Conventions
+
+- **Honest gaps**: if a notebook can't reproduce a claimed number (library drift, missing data), say so in the unit README with what was checked - never tune until it matches.
+- **New session in an existing workspace**: read `AGENTS.md` -> `NOTES` -> the book's `about.md` progress table -> `git log --oneline` + `git status` -> the current unit's `README.md`, then resume the pipeline at its first incomplete step (the source pipeline's gate defines the upstream steps' end states; the exit gate above defines the rest).
+- **Running steps with subagents** (the judgment-heavy steps - correction passes, lesson authoring - parallelize well, with three rules learned the hard way): dispatch at most 2-3 concurrent workers (4-5 tripped a provider 5-hour usage cap twice on one course; solo dispatches kept working); **audit `git status` and diffs before re-dispatching a "failed" worker** - workers that time out or die writing their final report often leave all their file edits already on disk; and give each worker the unit's own paths and IDs in the prompt, so it never has to trust summary-level context.
+- Skill scripts and extractors are regenerable; never commit `.venv`, caches, build output, or media.
 
 ## Acquiring Wisdom
 
@@ -242,8 +347,8 @@ Some learning topics lend themselves to reference:
 - Exercises and routines for fitness
 - Glossaries for any topic with its own nomenclature
 
-Glossaries, in particular, are an essential reference. Once one is created, it should be adhered to in every lesson.
+Glossaries, in particular, are an essential reference. Once one is created, it should be adhered to in every lesson (format: [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md)).
 
 ## `NOTES`
 
-The user will sometimes express preferences of how they want to be taught, or things you should keep in mind. This is the place to record those preferences, so you can refer back to them when designing lessons or working with the user. (Quarto flavor: `NOTES.qmd` with a `title` header so it renders like the rest; mdBook flavor: `NOTES.md` in the book's `src/`.)
+The user will sometimes express preferences of how they want to be taught, or things you should keep in mind. This is the place to record those preferences, so you can refer back to them when designing lessons or working with the user. (Location per flavor: [Workspace Layout](#workspace-layout).)

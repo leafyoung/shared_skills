@@ -12,9 +12,10 @@ description: >-
   "make a course from this PDF/textbook chapter", or otherwise wants the
   slides→index→lessons→resources→notebooks pipeline over static files — no
   audio/video, hence no download or transcription step. Pairs with the `teach`
-  skill (teaching rules; mdBook mechanics live in the `mdbook-authoring`
-  skill); the video-course sibling for
-  lecture-video sources is `video-teach`.
+  skill (pedagogy, workspace layout, lessons into the book, resources,
+  verification gates), the `teach-marimo` skill (companion notebooks), and the
+  `mdbook-authoring` skill (book mechanics); the sibling for lecture-video
+  sources is `video-teach`.
 ---
 
 # Build a course workspace from slides or documents
@@ -23,7 +24,14 @@ Turn static source material — a slide deck, a report, a textbook chapter, a
 workbook of spreadsheets — into a **teaching workspace**: one git repo whose
 per-unit folders hold every primary source (page captures, per-page text,
 speaker notes, resource snapshots, notebook, lessons), and one mdBook that
-teaches the course. The pipeline per unit:
+teaches the course. The workspace structure, state-doc flavor, book layout,
+resource rules, and the exit gate are the **teach** skill's
+course flavor with these parameters: unit folder `unitN_<slug>/`, join key the
+source page number `pNNN`, authoring inputs the pages index + text layer +
+speaker notes, and one unit per source document. Steps 3–6 (lessons into the
+book, resources, marimo notebook, wrap) are the teach skill's (notebooks per
+teach-marimo), with this course's content sources and citation rule noted
+below. The pipeline per unit:
 
 ```
 source file ──convert/ingest──► unit/source/ (original, committed)
@@ -33,8 +41,8 @@ source file ──convert/ingest──► unit/source/ (original, committed)
   ├──pptx speaker notes──► notes.md   (the narration intent, when the format has it)
   │
   ▼
-mdbook lessons (teach skill)            unit/notebooks/*.py (marimo)
-+ unit/resources/*.qmd snapshots        + unit README + learning records
+mdbook lessons (teach skill)              unit/notebooks/*.py (marimo,
++ unit/resources/*.qmd snapshots          per teach-marimo) + unit README
 ```
 
 The document itself is **ground truth**: never teach from parametric memory
@@ -53,69 +61,6 @@ argument's shape before writing anything, then reconcile against the page
 images where they disagree — the image outranks the text layer on layout,
 figures, and rendered formulas; the text layer outranks the image on exact
 wording and numbers (OCR/selection is exact; visual reading is not).
-
-## Workspace layout (create once per course)
-
-```
-<course>/
-├── AGENTS.md              # how to work here: layout + conventions (adapt on init)
-├── MISSION.qmd            # teach-skill mission (root, canonical)
-├── RESOURCES.qmd          # acquisition ledger (root, canonical; snapshots per-unit)
-├── NOTES.qmd              # scratchpad (root, canonical)
-├── pyproject.toml         # ONE uv project for the whole course (marimo — pin the
-│                          #   version, pillow, pytest, ruff, python-pptx/pandas as needed)
-├── .python-version        # 3.12 unless the course needs otherwise
-├── .gitignore             # mdbook/book/, output/, __pycache__, caches
-├── mdbook/                # the course book (teach-skill mdBook flavor)
-│   ├── book.toml          #   scaffold per the mdbook-authoring skill's Route A
-│   │                      #   (admonish+katex+text-fix)
-│   ├── src/SUMMARY.md     #   one Part per unit; every file listed or it won't render
-│   ├── src/about.md       #   course overview + progress table (the resume anchor;
-│   │                      #   NOT mission.md — root MISSION.qmd is canonical)
-│   ├── src/unitN-<slug>/  #   unit overview chapter + lessons/*.md for that unit
-│   ├── src/reference/     #   cross-unit cheat sheets (glossary.md first)
-│   └── src/assets/unitN/  #   copies of figures embedded in lessons (source in unitN/assets/)
-└── unitN_<slug>/          # one folder per source document — everything else is per-unit
-    ├── README.md          # source provenance, page count, topic map, what's built, gaps
-    ├── source/            # the original file(s), committed (gitignore + note in NOTES
-    │                      #   only if a file is genuinely huge, say >20 MB)
-    ├── pages/pageK_<slug>_pNNN.png + README.md   # the authoritative page index
-    ├── notes.md           # speaker notes extracted from pptx (empty if none)
-    ├── notebooks/<slug>.py # marimo notebook(s)
-    ├── resources/         # downloaded PDFs; web snapshots as resources/web/*.qmd
-    ├── assets/            # lesson figure generation scripts + rendered images
-    ├── output/            # marimo export artifacts (gitignored)
-    └── learning-records/  # per-unit ZPD findings, per teach skill
-```
-
-**Canonical vs book.** MISSION/RESOURCES/NOTES stay `.qmd` at the root — the
-same sanctioned **video-course flavor** of teach's state-doc rule (root `.qmd`
-state docs kept as editor-readable ledgers, deliberately never rendered; see
-teach "Output Formats"). The book's `about.md` is the in-book summary, not a
-duplicate. Reference docs live in the book (it's the living format). Record
-the flavor choice in `NOTES`. Every mdBook rule — toolchain pinning, plugin
-wiring, SUMMARY completeness, zero-warning build bar, style table — is in the
-**mdbook-authoring** skill (`~/.agents/skills/mdbook-authoring/`, shared by
-teach/video-teach/slides-teach); follow it, starting from its bundled
-`assets/book.toml`.
-
-**Python code.** One root `pyproject.toml`, no per-unit files; add a
-dependency once at the root when any unit needs it. Notebooks are **marimo,
-never Jupyter** (user preference; also a teach-skill rule). Add a root
-`.vscode/settings.json` so every `unitN_<slug>/notebooks/*.py` opens as a
-marimo notebook while `assets/*.py` figure scripts and any `src/` package
-keep the default Python editor (ipynb-to-marimo skill's
-`workbench.editorAssociations` pattern — add an explicit `"default"`
-override for any non-notebook `.py` that would otherwise fall inside the
-notebook glob):
-
-```json
-{
-  "workbench.editorAssociations": {
-    "**/unit*_*/notebooks/*.py": "marimo-notebook"
-  }
-}
-```
 
 ## Unit pipeline
 
@@ -179,96 +124,20 @@ For **XLSX sources**: skip page extraction. Dump each sheet's shape, header
 row, dtypes, and a representative sample into `pages/README.md` (as an
 inventory, same authoritativeness), and note derived fields worth teaching.
 
-### Step 3 — Lessons (teach skill, mdBook flavor)
+### Steps 3–6 — lessons, resources, notebook, wrap (teach, notebooks per teach-marimo)
 
-Author per the `teach` skill with output format **mdbook** — its teaching
-rules (mission grounding, Motivate/Establish/Connect/Check per node,
-unconditional truths first, exercises with answer keys, citations, ZPD) all
-apply unchanged.
-
-- Course content comes from `pages/README.md` (densest source), the text
-  layer, and `notes.md` (narration intent), joined by page number. The source
-  tells you *what to teach and in what order*; the teach rules tell you *how*.
-- 2–4 lessons per substantial source (say, per 30–40 content pages), each
-  tightly-scoped, self-contained, with a single tangible win and its
-  `## Exercises`/`## Answers` sections. A lesson with unanswered exercises
-  must not ship.
-- Book structure: one Part per unit in `SUMMARY.md`; each Part opens with a
-  unit overview chapter (what the source covers, link to the original,
-  links to its notebook and resources) followed by the lessons. Add each
-  chapter to `SUMMARY.md` in the same edit that creates it.
-- Cite the source: by page ("source p.12") with a relative link to the kept
-  page image in `mdbook/src/assets/unitN/`, and to the unit's `pages/README.md`
-  row. Figures are regenerable — generation script in
-  `unitN_<slug>/assets/lessonNNNN-<topic>.py`, rendered image beside it,
-  **copy** the image into `mdbook/src/assets/unitN/` for embedding (re-copy
-  after regenerating).
-- Source page images may be embedded in lessons where the page IS the content
-  (a key formula, a result table): copy into `mdbook/src/assets/unitN/`
-  likewise, and keep a conservative copyright posture — brief excerpts for
-  personal study are fine, wholesale re-publication is not.
-- Build bar: `mdbook build` with zero warnings; math via KaTeX, callouts via
-  admonish, per the mdbook-authoring skill's style table and gotchas (escape
-  literal `$`, wire the text-fix preprocessor, no `README.md` in src/).
-
-### Step 4 — Resources (download on the spot, as qmd)
-
-`RESOURCES.qmd` at the root is the ledger; per the teach skill, **every entry
-is acquired the moment it's added**, and in this workspace acquisition means:
-
-- Papers / references / cited works → PDF verbatim into `unitN_<slug>/resources/`.
-- Web pages (project sites, docs, course pages) → snapshot to
-  `unitN_<slug>/resources/web/<slug>.qmd`: YAML `title`, a provenance
-  blockquote (source URL, fetch date, license note), then the content as
-  markdown.
-- The source document itself → entry marked *in-repo* pointing at
-  `unitN_<slug>/source/`.
-- Find the official materials first (the deck's own course page, the paper's
-  landing page, the workbook's companion site); they beat any third-party
-  summary. Cite them from the unit's lessons.
-
-Before finishing any session: every `RESOURCES.qmd` entry has a local path or
-an explicit streaming-only/paywalled note.
-
-### Step 5 — Marimo notebook
-
-Each unit gets `unitN_<slug>/notebooks/<slug>.py` — an interactive companion
-that runs the source's central artifact: the algorithm it teaches, the worked
-example, the visualization of the phenomenon, the spreadsheet model made
-live. Conventions:
-
-- marimo app with `app_title`, `hide_code` markdown cells explaining each
-  section, LaTeX via `$...$`/`$$...$$` in `mo.md`, interactive controls
-  (`mo.ui.slider`, `mo.ui.text`) wherever a parameter is pedagogically
-  interesting.
-- Self-contained: synthetic data or tiny bundled samples by default; for XLSX
-  sources, bundle the real sheet as a small CSV in `unitN_<slug>/data/` when
-  it is small enough to commit, else generate a faithful synthetic stand-in
-  and say so.
-- **Verify by execution**: `uv run python
-  ~/.agents/skills/slides-teach/scripts/run_marimo_notebook.py
-  unitN_<slug>/notebooks/<slug>.py` — it imports the module, runs every cell
-  via `app.run(defs={"mo": marimo})`, and detects a raised cell by diffing
-  the notebook's statically declared cell outputs against the definitions the
-  run actually produced (headless marimo swallows plain cell exceptions —
-  verified on 0.25.0). Any failure exits nonzero. (Plain `marimo export html`
-  is NOT a verifier here: it exits 0 on broken cells AND wrongly exits 1 on
-  correct mo-using notebooks.) Reference the notebook from the unit overview
-  chapter and the relevant lessons (repo-relative path in prose).
-
-### Step 6 — Wrap the unit
-
-1. `unitN_<slug>/README.md`: source provenance (origin, date, version), the
-   page index summary, what was built (lessons, notebook, resources), open
-   gaps (sketched-but-unexplained content, typos found in the source).
-2. Learning records when the session surfaced something non-obvious (a ZPD
-   finding, an extraction convention decision, an erratum in the source).
-3. Update root `RESOURCES.qmd` / `NOTES.qmd`; bump the unit's row in the
-   book's `about.md` progress table (keep this table — it is the resume
-   anchor).
-4. Commit at unit boundaries (`unit3: pages indexed, 2 lessons, notebook`); on
-   a long unit, commit at pipeline-step boundaries too (`unit3: pages indexed`)
-   — never leave hours of extraction/indexing work uncommitted.
+Author per the teach skill with this course's parameters: authoring inputs are
+`pages/README.md` (densest source), the text layer, and `notes.md`
+(narration intent), joined by page number — the source tells you *what to
+teach and in what order*. Lesson cadence: 2–4 lessons per substantial source
+(say, per 30–40 content pages). Cite the source by page ("source p.12") with
+a relative link to the kept page image and the `pages/README.md` row. The
+source document itself enters `RESOURCES` marked *in-repo*, pointing at
+`unitN_<slug>/source/`. Everything else - book structure, figures,
+copyright posture, wrap-up and the exit gate - is the teach skill's;
+companion notebooks are the teach-marimo skill's (built by default here;
+skipped when the source teaches a non-Python language; the XLSX data-bundling
+rule is teach-marimo's).
 
 ## Conventions
 
@@ -277,33 +146,8 @@ live. Conventions:
 - **Formulas are transcribed as text** in the index; the page image outranks
   the text layer on rendered formulas and layout; the text layer outranks the
   image on exact wording and numbers.
-- **Honest gaps**: if a notebook can't reproduce a claimed number (library
-  drift, missing data), say so in the unit README with what was checked —
-  never tune until it matches. Errata in the source get teach-skill ERRATA
-  tags at the point of use, preserving the caveat "flagged, not yet confirmed
-  with the source's owner".
-- **Per-unit placement is not negotiable**: only AGENTS.md, MISSION/RESOURCES/
-  NOTES, pyproject.toml, .python-version, .gitignore, and mdbook/ are
-  root-level; everything else lives in `unitN_<slug>/`.
-- **New session in an existing course**: read AGENTS.md → NOTES.qmd → the
-  book's `about.md` progress table → `git log --oneline` + `git status` → the
-  current unit's README.md, then resume the pipeline at its first incomplete
-  step (the checklist below defines each step's end state: `source/` present
-  = Step 1 done, `pages/README.md` present = Step 2 done, …).
-- Skill-scripts and extractors are regenerable; never commit `.venv`, caches,
-  build output.
-
-## Verification checklist (per unit, before commit)
-
-- [ ] source: original (and normalized PDF, if converted) in `unitN_<slug>/source/`
-- [ ] pages: content pages kept as `pageK_<slug>_pNNN.png`; `pages/README.md`
-      table covers every kept page with formulas verified against images; `pages_raw/` deleted
-- [ ] notes.md extracted for pptx sources (or marked "none")
-- [ ] book: new chapters in `SUMMARY.md`; `mdbook build` zero warnings; exercises all answered
-- [ ] notebook: `run_marimo_notebook.py` exits 0 — the execution bar; headless
-      `marimo export html` can silently skip `mo` injection AND exits 0 on
-      broken cells (an HTML export into `output/` is optional); linked from the
-      unit's book chapters
-- [ ] resources: every RESOURCES.qmd entry added this session has a local path or
-      streaming-only note
-- [ ] unit README current; git commit(s) for the unit
+- **Errata in the source** get teach-skill ERRATA tags at the point of use
+  (teach "Mirrors, sync, and verification").
+- **New session in an existing course**: follow teach's resume order;
+  Step 1–2 end state is `pages/README.md` present (and `notes.md` extracted
+  for pptx, or marked "none"), the rest is the teach exit gate.
