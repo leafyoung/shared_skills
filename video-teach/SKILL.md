@@ -44,7 +44,7 @@ the lecture series teaches a non-Python language). The pipeline per episode:
 
 ```
 video/URL ──transcribe-video──► transcript/<slug>.raw.vtt + .clean.md   (Step 1;
-  │                             intermediates kept: video/audio + .groq.* + .srt)
+  │                             intermediates kept: video/audio + .transcript.* + .srt)
   └──ffmpeg frames──► slides/slideK_*.png + slides_ocr.json             (Step 2;
                                        │            timestamps join keys)
                      ┌─────────────────┴──────────────────┐
@@ -93,8 +93,12 @@ figures silently — no build warning will ever catch it.
 ### Step 1 — Transcribe (via the `transcribe-video` skill)
 
 One step covers download + transcription: invoke the transcribe-video skill and
-follow it exactly, passing the **YouTube URL** (it downloads the video itself)
-or a **local video/audio file**. Course-specific points:
+follow it exactly, passing the **YouTube URL** or a **local video/audio file**.
+For YouTube URLs pass `--best-video` — the tool's default is an audio-only
+download, and Step 2 needs the video file for slide extraction (with
+`--best-video` the binary also downloads a separate audio track and
+transcribes from that, so transcription quality is unchanged). Course-specific
+points:
 
 - **The video intermediary is kept** (standing override: callers skip the
   skill's move-and-cleanup) — Step 2 needs the same video file for slide
@@ -107,7 +111,7 @@ or a **local video/audio file**. Course-specific points:
   Groq). The slide-OCR-grounded term pass runs in Step 3, after Step 2's OCR
   exists.
 - **Leave the timing file as `transcript/<slug>.raw.vtt`**: copy (not move)
-  the skill's `<name>.groq.transcript.srt` — or the caller-supplied
+  the skill's `<name>.transcript.srt` — or the caller-supplied
   `.vtt`/`.srt` — to that name. Step 3's commands read exactly this file.
 - **Retrofit (episode has no raw timing file** — courses that predate the
   pipeline): rebuild it from YouTube's auto-captions, subtitle-only. A
@@ -129,6 +133,17 @@ or a **local video/audio file**. Course-specific points:
   `--output-dir <episode>/transcript --output-name <slug>` so outputs land with
   the right names on the first pass. On `HTTP 403`/`HTTP 500` (SABR/client
   problem): retry with `--extractor-args "youtube:player_client=visionos"`.
+- **Native-caption skip defeats `--best-video`:** if the tool logs
+  "Native-language subtitles available — transcription skipped", it used YouTube's
+  auto-captions and never ran Whisper, even with `--best-video` (seen 2026-10 on a
+  3h freeCodeCamp lecture). For course-grade quality: extract the audio from the
+  downloaded video (`ffmpeg -i video -vn -c:a copy out.audio.webm`) and transcribe
+  the local file with the same `--output-name`/`--output-dir` — the Whisper pass is
+  the raw layer a course wants.
+- `--best-video` downloads may be `.webm` **without stream duration metadata**
+  (live-stream recordings): `extract_slides.py` fails on `ffprobe duration=N/A`.
+  Remux first: `ffmpeg -i in.webm -c copy out.mp4`, keep the mp4 in the media
+  cache, and record the remux in `MEDIA.md`.
 - Fetch `%(title)s`/`%(channel)s`/`%(duration_string)s` first to pick the
   episode `<slug>` (lowercase, descriptive, one separator style per course).
 - **Timestamps are the join key** for everything downstream — slide files, the
