@@ -11,11 +11,10 @@ description: >-
   "build a course from these slides", "turn this deck/document into lessons",
   "make a course from this PDF/textbook chapter", or otherwise wants the
   slides→index→lessons→resources→notebooks pipeline over static files — no
-  audio/video, hence no download or transcription step. Pairs with the `teach`
-  skill (pedagogy, workspace layout, lessons into the book, resources,
-  verification gates), the `teach-marimo` skill (companion notebooks), and the
-  `mdbook-authoring` skill (book mechanics); the sibling for lecture-video
-  sources is `video-teach`.
+  audio/video, hence no download or transcription step. Pairs with `teach`
+  (pedagogy, workspace layout, lessons, resources, verification gates),
+  `teach-marimo` (companion notebooks), and `mdbook-authoring` (book
+  mechanics); the sibling for lecture-video sources is `video-teach`.
 ---
 
 # Build a course workspace from slides or documents
