@@ -1,6 +1,7 @@
 ---
 name: gh-copilot-pr-roll
-description: This skill should be used when the user asks to "roll Copilot review on a PR", "loop Copilot review until clean", "fix Copilot's PR comments and re-review", "iterate with Copilot code review", or gives a goal like "fix all open and previously missed issues on PR N, push, trigger Copilot review, repeat until no issues". Runs the fix → push → request Copilot review → wait → read findings cycle until Copilot reports nothing open; if Copilot is out of quota or otherwise can't run, switches once to a local subagent reviewer (Copilot Chat's review prompt) and loops until it reports no feedback.
+description: This skill should be used when the user asks to "roll Copilot review on a PR", "loop Copilot review until clean", "fix Copilot's PR comments and re-review", "iterate with Copilot code review", or gives a goal like "fix all open and previously missed issues on PR N, push, trigger Copilot review, repeat until no issues". Runs the fix → push → request Copilot review → wait → read findings cycle until Copilot reports nothing open. Replies only on GitHub Copilot's review; if Copilot is out of quota or does not run, it stops and reports (use pr-roll for a local subagent reviewer instead).
+version: 0.2.0
 ---
 
 # gh-copilot-pr-roll
@@ -8,7 +9,7 @@ description: This skill should be used when the user asks to "roll Copilot revie
 Drive a GitHub PR to a clean Copilot review by repeating one cycle:
 **fix → commit/push → confirm commit on PR → request Copilot review → wait → read findings → fix.**
 Stop when the newest Copilot review has no Open and no "Previously missed" items.
-If Copilot is unavailable (quota, rejected re-request, timeout), the same loop continues in **local mode** (see below) with a subagent as the reviewer.
+This skill works against GitHub Copilot only. If Copilot is unavailable (quota, rejected re-request, timeout), stop and tell the user; the `pr-roll` skill rolls the same PR with a local subagent reviewer.
 
 Needs `gh` authenticated with access to the repo. Set `R=owner/repo`, `N=pr-number`.
 
@@ -65,7 +66,7 @@ until [ "$(gh pr view $N --repo $R --json headRefOid -q .headRefOid)" = "$SHA" ]
 ```
 Wait until the PR head equals the pushed SHA before requesting a review — otherwise Copilot reviews a stale commit.
 
-### 4. Request the Copilot review (skip entirely in local mode)
+### 4. Request the Copilot review
 ```bash
 gh pr edit $N --repo $R --add-reviewer @copilot
 ```
@@ -82,44 +83,14 @@ echo "copilot reviewed $SHA"
 Typical latency is 5–15 min. Foreground `sleep` is blocked in Claude Code; re-arm the monitor on its 30-minute expiry if needed. Never push another commit mid-wait without re-requesting the review for the new SHA.
 
 ### 5b. One-time availability check
-Do this **once per run**, right after the first request in step 4 — never again. Copilot is unavailable if any of: the PR timeline shows no new `review_requested` event ~2 min after the request; a Copilot comment/review mentions quota, limit, or "unable to review"; the request command errors. Also treat the step-5 wait expiring (~30 min with no review for `$SHA`) as unavailable. On any hit set `LOCAL=1` for the rest of the run: do not request, wait for, or re-check Copilot again (no retry, no "maybe quota reset"). If the check passes, proceed with step 5 as normal.
+Do this **once per run**, right after the first request in step 4 — never again. Copilot is unavailable if any of: the PR timeline shows no new `review_requested` event ~2 min after the request; a Copilot comment/review mentions quota, limit, or "unable to review"; the request command errors. Also treat the step-5 wait expiring (~30 min with no review for `$SHA`) as unavailable.
+On any hit **stop**: do not retry, re-request, or wait again, and do not fall back to another reviewer on your own. Report to the user what was observed (no `review_requested` event, quota message, timeout) and the state of the PR (head SHA, commits pushed, findings fixed so far), and suggest the `pr-roll` skill for a local subagent review. If the check passes, proceed with step 5 as normal.
 
 ### 6. Loop or finish
 Back to step 1 on the new review. Done when the latest review for the current HEAD lists no Open and no Previously-missed items (a "Resolved" section alone is fine). Report: commits pushed, findings fixed per round, and anything disputed.
 
-## Local mode (Copilot unavailable)
-Replaces steps 4–5 (and the review-reading in step 1) with a subagent review of the local change. Everything else — fix at root, minimal check, commit/push, step 2b replies on existing threads — is unchanged.
-
-1. Build the input: `git diff $(gh pr view $N --repo $R --json baseRefName -q .baseRefName)...HEAD` (add `git show <path>` context for touched files as needed).
-2. Spawn one subagent (Agent tool, general-purpose, fresh each round so it is not anchored by earlier rounds) with the prompt below, the diff, and read access to the repo. If `AGENTS.md` / `CLAUDE.md` has review rules, paste them in place of the `{review rules}` line; otherwise drop that line. The subagent only reviews — it must not edit.
-3. Fix every item it reports (verify against code first; dispute a wrong one with evidence rather than skipping silently), run the minimal check, commit, push.
-4. Re-run from step 1 on the new diff. **Done when the subagent replies exactly `No feedback to provide.`** If the same finding comes back 3 rounds running after fixes, stop and ask the user.
-
-Prompt (adapted from the open-source Copilot Chat `provideFeedback.tsx` review prompt):
-```
-You are a world-class software engineer and the author and maintainer of the discussed code. Your feedback perfectly combines detailed feedback and explanation of context.
-{review rules from AGENTS.md, if any}
-Additional Rules
-Think step by step:
-
-1. Examine the provided code and any other context like user question, related errors, project details, class definitions, etc.
-2. Provide feedback on the current change on where it can be improved or introduces a problem.
-   * 2a. Avoid commenting on correct code.
-   * 2b. Avoid commenting on commented out code.
-   * 2c. Keep scoping rules in mind.
-3. Reply with an enumerated list of feedback with source line number, filepath, kind (bug, performance, consistency, documentation, naming, readability, style, other), severity (low, medium, high), and feedback text.
-   * E.g.: 1. Line 357 in src/flow.js, bug, high severity: `i` is not incremented.
-   * E.g.: 2. Line 361 in src/arrays.js, documentation, low severity: Function `binarySearch` is not documented.
-   * E.g.: 3. Line 176 in src/vs/platform/actionWidget/browser/actionWidget.ts, consistency, medium severity: The color id `'background.actionBar'` is not consistent with the other color ids used. Use `'actionBar.background'` instead.
-   * E.g.: 4. Line 410 in src/search.js, documentation, medium severity: Returning `-1` when the target is not found is a common convention, but it should be documented.
-   * E.g.: 5. Line 51 in src/account.py, bug, high severity: The deposit method is not thread-safe. You should use a lock to ensure that the balance update is an atomic operation.
-   * E.g.: 6. Line 220 in src/account.py, readability, low severity: The withdraw method is very long and combines multiple logical steps, consider splitting it into multiple methods.
-4. Try to sort the feedback by file and line number.
-5. When there is no feedback to provide, reply with "No feedback to provide."
-```
-
 ## Gotchas
-- **Re-request stalls.** If the PR timeline (`gh api repos/$R/issues/$N/timeline`) shows no new `review_requested` event after your request, Copilot did not accept it. That is the step-5b unavailable signal: switch to local mode immediately — no remove/re-add, no GraphQL retry, no waiting or asking the user.
+- **Re-request stalls.** If the PR timeline (`gh api repos/$R/issues/$N/timeline`) shows no new `review_requested` event after your request, Copilot did not accept it. That is the step-5b unavailable signal: stop and report immediately — no remove/re-add, no GraphQL retry, no waiting.
 - If a fix changes a PR's scope (new file, contract change), update the PR description in the same round; Copilot flags undocumented scope.
 - macOS `sed -i` needs `-i ''`; a failed `sed` in an `&&` chain silently skips later steps — prefer small Python edits and check `git log` after.
 - Requesting review before the push lands on the PR yields a review of the old SHA.
