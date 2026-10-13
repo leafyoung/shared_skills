@@ -257,10 +257,42 @@ def apply_corrections(text, reps):
     return text, applied, missed
 
 
+def strip_leading_provenance(srt_text: str) -> str:
+    """Drop LEADING SRT blocks that duplicate the markdown header (provenance:
+    video URL, speaker/preamble notes). Speech is never matched - the strip
+    stops at the first block that is not a known provenance line."""
+    provenance = re.compile(
+        r"^(?:https?://\S+|Speakers?:\s|Transcription cleaned|Timestamps reference|"
+        r"Square brackets|The recording|Provenance:|主讲人|转录文本)"
+    )
+    tag_prefix = re.compile(r"^\s*(?:\[Slide \d+\]\s*)+")
+    blocks = re.split(r"\n\s*\n", srt_text.strip())
+    while blocks:
+        lines = blocks[0].splitlines()
+        text = lines[2] if len(lines) >= 3 else (lines[-1] if lines else "")
+        if provenance.match(tag_prefix.sub("", text).strip()):
+            blocks.pop(0)
+        else:
+            break
+    return "\n\n".join(blocks) + ("\n" if blocks else "")
+
+
 def tag_srt_text(srt_text, slides):
-    """Prepend [Slide K] to an SRT entry's first text line when the entry's
-    start falls in slide K's window (tag shown only on slide change).
-    Entries already carrying a tag are re-tagged in place — idempotent."""
+    """Prepend [Slide K] to SRT entries from slide K's on-screen window.
+
+    Rules (2026-10-13 rework, see tests/test_srt_tagging.py):
+    - a cue starting BEFORE the first slide window is preamble - it gets no
+      tag (the old fallback tagged it with the LAST slide's number, which is
+      the bogus header-tag artifact seen on every pre-2026-10-13 episode);
+    - a cue starting after the last window keeps the last slide (the final
+      slide stays on screen through closing remarks);
+    - a slide whose window contains no cue start is anchored on the first cue
+      that overlaps the window (started before it, ends inside/after) - its
+      tag stacks after any tag already on that cue, so tag order stays
+      ascending; a slide with no overlapping cue at all (silent flip-through)
+      stays untagged;
+    - entries already carrying tags are stripped and re-derived - idempotent.
+    """
     slides = sorted(slides, key=lambda x: x["start_s"])
 
     def slide_at(t):
@@ -269,27 +301,61 @@ def tag_srt_text(srt_text, slides):
             if s["start_s"] <= t < s["end_s"]:
                 k = i
                 break
-        # times outside every window (demo gaps) keep the last seen slide;
-        # flip-backs to an earlier slide cannot be derived from timing alone -
-        # the slides/README.md notes callbacks (skill convention).
-        return k if k is not None else (len(slides) if slides else None)
+        if k is None and slides and t >= slides[-1]["end_s"]:
+            k = len(slides)  # the last slide stays up through closing remarks
+        return k  # None = before the first slide window: preamble, untagged
 
-    out, last = [], None
-    for b in re.split(r"\n\s*\n", srt_text.strip()):
+    blocks = []
+    for b in re.split(r"\n\s*\n", strip_leading_provenance(srt_text).strip()):
         lines = b.splitlines()
-        if len(lines) >= 3 and re.match(r"\s*\[Slide \d+\]\s*", lines[2]):
-            lines[2] = re.sub(r"^\s*\[Slide \d+\]\s*", "", lines[2])
+        if len(lines) >= 3:
+            lines[2] = re.sub(r"^\s*(?:\[Slide \d+\]\s*)+", "", lines[2])
         m = TS.search(lines[1]) if len(lines) >= 2 else None
-        if m is None:
-            out.append("\n".join(lines))
+        start_s = end_s = None
+        if m is not None:
+            g = [int(x) for x in m.groups()]
+            start_s = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000
+            end_s = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000
+        blocks.append({"lines": lines, "start": start_s, "end": end_s, "tags": []})
+
+    anchored, anchor_idx = set(), {}
+    for idx, blk in enumerate(blocks):
+        if blk["start"] is None:
             continue
-        g = [int(x) for x in m.groups()]
-        t0 = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000
-        k = slide_at(t0)
-        if k is not None and k != last:
-            lines[2] = f"[Slide {k}] " + lines[2]
-            last = k
-        out.append("\n".join(lines))
+        k = slide_at(blk["start"])
+        if k is not None and k not in anchored:
+            blk["tags"].append(k)
+            anchored.add(k)
+            anchor_idx[k] = idx
+    # second pass: slides whose window contains no cue start (a short slide
+    # shown mid-cue) anchor on the first cue at or after the previous slide's
+    # anchor whose playback overlaps the window, stacking after existing tags
+    # - this keeps tags ascending in file order. A slide whose window ends
+    # before that cue (a silent flip-through) legitimately stays untagged.
+    for i, s in enumerate(slides, 1):
+        if i in anchored:
+            continue
+        base = 0
+        for j in range(i - 1, 0, -1):
+            if j in anchor_idx:
+                base = anchor_idx[j]
+                break
+        for idx in range(base, len(blocks)):
+            blk = blocks[idx]
+            if blk["start"] is None:
+                continue
+            if blk["start"] < s["end_s"] and (blk["end"] or blk["start"]) > s["start_s"]:
+                blk["tags"].append(i)
+                anchored.add(i)
+                anchor_idx[i] = idx
+                break
+    out = []
+    for blk in blocks:
+        if blk["tags"]:
+            prefix = " ".join(f"[Slide {k}]" for k in sorted(blk["tags"]))
+            body = blk["lines"][2] if len(blk["lines"]) >= 3 else ""
+            blk["lines"][2] = f"{prefix} {body}".strip()
+        out.append("\n".join(blk["lines"]))
     return "\n\n".join(out) + "\n"
 
 
