@@ -45,6 +45,46 @@ def preprocess(png: Path) -> Path:
     return out
 
 
+MENU_TOKENS = re.compile(
+    r"(?:chrome\b|chromium\b|safari\b|firefox\b|file\s+edit\s+view|"
+    r"bookmarks|window\s+help|localhost|127\.0\.0\.1|ask gemini|"
+    r"address bar)", re.I,
+)
+
+
+def strip_browser_chrome(text: str) -> str:
+    """Drop OCR content from the browser menu bar / address strip - decks
+    rendered in a browser (e.g. a localhost slide server) put 'Chrome',
+    'File Edit View History Bookmarks', 'localhost:3030' above the real
+    slide title, which used to become the index's first-line excerpt. OCR
+    merges menu/address/title into run-on lines starting with arbitrary
+    glyphs, so: any line containing the localhost address token is cut
+    through it; any line hitting >= 2 menu-bar tokens is dropped whole;
+    sub-2-character fragments are dropped."""
+    kept = []
+    for ln in text.splitlines():
+        # fuzzy markers: OCR mangles the address strip (locathost, Ask Gemir)
+        for marker in (r"lo[a-z@]{1,3}host", r"ask\s*gem[a-z]{0,3}", r"gemini\b"):
+            m = None
+            for m in re.finditer(marker, ln, re.I):
+                pass
+            if m is not None:
+                e = m.end()
+                while e < len(ln) and not ln[e].isspace():
+                    e += 1  # consume the address-strip tail (:3030/2?clicks=0 …)
+                if e < len(ln) and ln[e] == " ":
+                    e += 1
+                ln = ln[e:]
+        low = ln.lower()
+        if len(re.findall(r"[a-z0-9]", ln.replace(" ", ""))) < 2:
+            continue
+        if len(MENU_TOKENS.findall(ln)) >= 2:
+            continue
+        if ln.strip():
+            kept.append(ln.rstrip())
+    return "\n".join(kept)
+
+
 def ocr(png: Path) -> str:
     src = preprocess(png)
     try:
@@ -101,7 +141,7 @@ def main():
         else:
             end_s = start_s + 600
             print("warn: --duration not given; last slide window set to +600s", file=sys.stderr)
-        text = ocr(p)
+        text = strip_browser_chrome(ocr(p))
         if len(text.split()) < 5:
             print(f"warn: {p.name} OCR yielded <5 words - check the slide image "
                   f"(dark theme, dense code, or a non-slide frame)", file=sys.stderr)
