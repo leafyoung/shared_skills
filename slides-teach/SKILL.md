@@ -134,7 +134,10 @@ source document itself enters `RESOURCES` marked *in-repo*, pointing at
 copyright posture, wrap-up and the exit gate - is the teach skill's;
 companion notebooks are the teach-marimo skill's (built by default here;
 skipped when the source teaches a non-Python language; the XLSX data-bundling
-rule is teach-marimo's).
+rule is teach-marimo's) - non-Python sources instead get `examples/` programs
+in the subject language per the **teach** skill's non-Python examples rule
+(every program compiled and executed, build command and observed output
+recorded in the examples README, each linked from the lesson it demonstrates).
 
 ## Conventions
 

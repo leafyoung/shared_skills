@@ -40,7 +40,11 @@ raw video timeline, authoring inputs the slides index + corrected transcript,
 root extras `MEDIA.md` (pointer to the gitignored video cache) and the kept
 transcript intermediates. Companion notebooks follow the **teach-marimo**
 skill's when-to-build rule (built by default for these courses; skipped when
-the lecture series teaches a non-Python language). The pipeline per episode:
+the lecture series teaches a non-Python language — for those, the unit carries
+`examples/` programs in the subject language per the **teach** skill's
+non-Python examples rule: every program compiled and executed, build command
+and observed output recorded in the examples README, each linked from the
+lesson it demonstrates). The pipeline per episode:
 
 ```
 video/URL ──transcribe-video──► transcript/<slug>.raw.vtt + .clean.md   (Step 1;
@@ -264,7 +268,8 @@ formally belong to Step 5. Cite the lecture by video timestamp + transcript
 section. Everything else - book structure, figures, copyright posture,
 wrap-up and the exit gate - is the teach skill's; companion notebooks are the
 teach-marimo skill's (built by default here; skipped for non-Python-language
-lecture series).
+lecture series, which instead get `examples/` per the teach skill's
+non-Python examples rule).
 Lesson language: the course's language; per-language mirror books only when
 the user explicitly requests a translated course.
 

@@ -76,10 +76,12 @@ uv run python ~/.agents/skills/teach-marimo/scripts/run_marimo_notebook.py \
     <unit>/notebooks/<slug>.py
 ```
 
-It imports the module, runs every cell via `app.run(defs={"mo": marimo})`,
-and detects a raised cell by diffing the notebook's statically declared cell
-outputs against the definitions the run actually produced. Any failure exits
-nonzero.
+It imports the module, runs every cell via `app.run(defs={"mo": marimo})`
+(falling back to the bare `app.run()` on marimo >= 0.13, where the defs kwarg
+was removed — verified 0.13.11, 2026-10-12; mo then comes from the
+notebook's own import cell), and detects a raised cell by diffing the
+notebook's statically declared cell outputs against the definitions the run
+actually produced. Any failure exits nonzero.
 
 Why this harness exists - neither naive check works:
 

@@ -2,9 +2,11 @@
 
 Usage: python3 run_marimo_notebook.py NOTEBOOK.py
 Imports the notebook module and calls app.run(), injecting `mo` explicitly
-(some environments don't inject mo into headless cell execution).
+(some environments don't inject mo into headless cell execution); on
+marimo >= 0.13 — where App.run() takes no arguments — it falls back to
+the bare call and mo comes from the notebook's own import cell.
 
-Failure detection: on current marimo (verified 0.25.0), a cell that raises
+Failure detection: on current marimo (verified 0.25.0 and 0.13.11), a cell that raises
 does NOT propagate its exception through app.run() — the run completes
 silently with the cell's definitions missing (and `marimo export html`
 exits 0 too, while wrongly failing on correct mo-using notebooks). So
@@ -69,7 +71,16 @@ def main() -> int:
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
-        outputs, defs = mod.app.run(defs={"mo": marimo})
+        try:
+            outputs, defs = mod.app.run(defs={"mo": marimo})
+        except TypeError:
+            # marimo >= 0.13 removed the defs kwarg (verified 0.13.11,
+            # 2026-10-12): App.run() takes no arguments and returns
+            # (outputs, defs); the notebook's own `import marimo as mo`
+            # cell provides mo. The TypeError here is arg-binding (raised
+            # before any cell executes), never a cell's own error — cell
+            # raises don't propagate through app.run().
+            outputs, defs = mod.app.run()
     except Exception as e:  # marimo semantic errors DO propagate (unlike cell raises)
         if "IncompleteRefsError" in type(e).__name__ + str(e):
             print(

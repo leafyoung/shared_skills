@@ -196,6 +196,8 @@ Future sessions: read `learning-records/` and `NOTES` to pick the next thing in 
 └── <unit>N_<slug>/        # one folder per unit - everything else is per-unit
     ├── README.md          # provenance, index summary, what's built, open gaps
     ├── notebooks/<slug>.py    # marimo companion notebook(s), per teach-marimo
+    ├── examples/          # non-Python courses: runnable subject-language programs
+    │                      #   (+ README: build commands, toolchain, observed output)
     ├── resources/         # downloaded PDFs; web snapshots as resources/web/*.qmd
     ├── assets/            # lesson figure generation scripts + rendered images
     ├── output/            # marimo export artifacts (gitignored)
@@ -348,6 +350,8 @@ Name the lesson's specific hard step in the ask-the-agent reminder - a generic i
 
 **Notebook preference:** the user prefers **marimo** notebooks over Jupyter for lesson-created notebooks and exercises; whether to build one, how, and how to verify it are the **teach-marimo** skill's.
 
+**Non-Python subjects — code examples instead of notebooks.** A course whose subject language is not Python (C++, Rust, SQL, …) skips notebooks and instead builds **runnable examples in the subject language**: one `<unit>/examples/` directory per unit holding small programs that demonstrate the lesson content, plus a README recording for each the exact build command, toolchain versions (and any vendored library pin), and the **observed output of a real run**. Examples are first-class teaching artifacts with the same bar as notebooks: compile and execute every example during the session it is written — a program that was never run is an unverified sketch, and the lesson pointing at it must say so — and link each example from the lesson it demonstrates (link the directory or a non-`.md` file; the build chain rewrites `.md` hrefs). Vendor a reference implementation only when the standard library cannot teach the subject (gitignore the clone, record the pin in the examples README), and verify the whole set at the exit gate.
+
 For printed multiple-choice questions (and in-chat options), construct the set so evenness is automatic — don't audit after the fact:
 
 - Every option is a bare claim — no justification anywhere. All reasoning goes in the answer key / explanation revealed after the user answers. The #1 tell is the correct option carrying its own "because…" while distractors stay bare.
@@ -390,6 +394,7 @@ A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): eve
 - [ ] book: new chapters in `SUMMARY.md` (added in the same edit that creates them); `mdbook build` zero warnings; exercises all answered
 - [ ] lessons cite the source layers per the course's join key; every figure or source image copied into `mdbook/src/assets/` is embedded by a lesson
 - [ ] notebooks (where this course builds them - teach-marimo's when-to-build rule): the teach-marimo verifier exits 0; linked from the unit's book chapters
+- [ ] examples (non-Python courses - the examples rule in Skills): every program in `<unit>/examples/` was compiled and executed, its observed output recorded in the examples README; each linked from the lesson it demonstrates
 - [ ] a verification pass that did not write the lessons re-derived every exercise answer against its source; Answers are numbered 1:1 with Exercises and no authoring notes remain in shipped text
 - [ ] model answers containing runnable code were executed once (recorded), or are labeled unverified sketch
 - [ ] glossary cross-references point at the lesson that actually establishes each term- [ ] resources: every ledger entry added this session has a local path or a streaming-only note
