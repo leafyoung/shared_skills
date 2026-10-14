@@ -15,6 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
+version: 1.1.0
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -327,6 +328,7 @@ For acquiring knowledge, difficulty is the enemy. It eats working memory you nee
 - Paywalled or unobtainable full texts -> say so plainly in the ledger; snapshot the abstract/landing page, and hunt an open-access substitute (author mirrors, `.edu` lecture notes, working-paper repositories, the Wayback Machine) rather than relying on the dead link.
 - Streaming or interactive media -> don't mass-download video; snapshot the landing page, mark the entry *streaming-only*, and note the offline substitute where one exists. In a video course the episode video is such an entry: *streaming* + the local cache path from `MEDIA.md` (never commit video). The course's own source document (slides courses) enters marked *in-repo*, pointing at `<unit>/source/`.
 - Find the official materials first (the course's or deck's own published materials beat any third-party summary); record and cite them from the unit's lessons.
+- **Discovery is web search's job too, not just verification.** The source's own citations are only the seed list: for every strand, search for what the source doesn't cite — the project's official docs and tutorials, the primary paper behind a second-hand claim, canonical references for prerequisite nodes the source assumes, a better explanation of the same concept when the source's is thin. Same acquisition bar as any other entry: verify before it enters the ledger, snapshot on the spot, record provenance.
 - If a planned strand depends on material living only in session history (review notes, transcripts, artifacts about to be deleted), export it into the workspace with provenance in the same session and ledger it like any resource - a strand whose evidence is not on disk is one context loss from unteachable.
 - Communities (the Wisdom group) do not depend on user contact - populate them even in autonomous runs.
 - Record the exact resolved version when snapshotting library or versioned docs - the exact version is what makes later errata classification possible.
