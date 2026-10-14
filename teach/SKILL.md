@@ -15,6 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
+version: 1.1.0
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -196,6 +197,8 @@ Future sessions: read `learning-records/` and `NOTES` to pick the next thing in 
 └── <unit>N_<slug>/        # one folder per unit - everything else is per-unit
     ├── README.md          # provenance, index summary, what's built, open gaps
     ├── notebooks/<slug>.py    # marimo companion notebook(s), per teach-marimo
+    ├── examples/          # non-Python courses: runnable subject-language programs
+    │                      #   (+ README: build commands, toolchain, observed output)
     ├── resources/         # downloaded PDFs; web snapshots as resources/web/*.qmd
     ├── assets/            # lesson figure generation scripts + rendered images
     ├── output/            # marimo export artifacts (gitignored)
@@ -325,6 +328,7 @@ For acquiring knowledge, difficulty is the enemy. It eats working memory you nee
 - Paywalled or unobtainable full texts -> say so plainly in the ledger; snapshot the abstract/landing page, and hunt an open-access substitute (author mirrors, `.edu` lecture notes, working-paper repositories, the Wayback Machine) rather than relying on the dead link.
 - Streaming or interactive media -> don't mass-download video; snapshot the landing page, mark the entry *streaming-only*, and note the offline substitute where one exists. In a video course the episode video is such an entry: *streaming* + the local cache path from `MEDIA.md` (never commit video). The course's own source document (slides courses) enters marked *in-repo*, pointing at `<unit>/source/`.
 - Find the official materials first (the course's or deck's own published materials beat any third-party summary); record and cite them from the unit's lessons.
+- **Discovery is web search's job too, not just verification.** The source's own citations are only the seed list: for every strand, search for what the source doesn't cite — the project's official docs and tutorials, the primary paper behind a second-hand claim, canonical references for prerequisite nodes the source assumes, a better explanation of the same concept when the source's is thin. Same acquisition bar as any other entry: verify before it enters the ledger, snapshot on the spot, record provenance.
 - If a planned strand depends on material living only in session history (review notes, transcripts, artifacts about to be deleted), export it into the workspace with provenance in the same session and ledger it like any resource - a strand whose evidence is not on disk is one context loss from unteachable.
 - Communities (the Wisdom group) do not depend on user contact - populate them even in autonomous runs.
 - Record the exact resolved version when snapshotting library or versioned docs - the exact version is what makes later errata classification possible.
@@ -347,6 +351,8 @@ Name the lesson's specific hard step in the ask-the-agent reminder - a generic i
 **Answers are not optional.** Every exercise printed in a lesson — multiple-choice, fill-in-the-blank, short prompt, real-world task — must have its answer or expected outcome (rubric) printed in the same lesson file, under the "Answers" heading. A lesson rendered with an unanswered exercise is incomplete and must not ship. (2026-09-15: lesson 0001 shipped with unanswered Skills questions and the user had to ask for the key — the exact failure mode this rule prevents.)
 
 **Notebook preference:** the user prefers **marimo** notebooks over Jupyter for lesson-created notebooks and exercises; whether to build one, how, and how to verify it are the **teach-marimo** skill's.
+
+**Non-Python subjects — code examples instead of notebooks.** A course whose subject language is not Python (C++, Rust, SQL, …) skips notebooks and instead builds **runnable examples in the subject language**: one `<unit>/examples/` directory per unit holding small programs that demonstrate the lesson content, plus a README recording for each the exact build command, toolchain versions (and any vendored library pin), and the **observed output of a real run**. Examples are first-class teaching artifacts with the same bar as notebooks: compile and execute every example during the session it is written — a program that was never run is an unverified sketch, and the lesson pointing at it must say so — and link each example from the lesson it demonstrates (link the directory or a non-`.md` file; the build chain rewrites `.md` hrefs). Vendor a reference implementation only when the standard library cannot teach the subject (gitignore the clone, record the pin in the examples README), and verify the whole set at the exit gate.
 
 For printed multiple-choice questions (and in-chat options), construct the set so evenness is automatic — don't audit after the fact:
 
@@ -390,6 +396,7 @@ A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): eve
 - [ ] book: new chapters in `SUMMARY.md` (added in the same edit that creates them); `mdbook build` zero warnings; exercises all answered
 - [ ] lessons cite the source layers per the course's join key; every figure or source image copied into `mdbook/src/assets/` is embedded by a lesson
 - [ ] notebooks (where this course builds them - teach-marimo's when-to-build rule): the teach-marimo verifier exits 0; linked from the unit's book chapters
+- [ ] examples (non-Python courses - the examples rule in Skills): every program in `<unit>/examples/` was compiled and executed, its observed output recorded in the examples README; each linked from the lesson it demonstrates
 - [ ] a verification pass that did not write the lessons re-derived every exercise answer against its source; Answers are numbered 1:1 with Exercises and no authoring notes remain in shipped text
 - [ ] model answers containing runnable code were executed once (recorded), or are labeled unverified sketch
 - [ ] glossary cross-references point at the lesson that actually establishes each term- [ ] resources: every ledger entry added this session has a local path or a streaming-only note

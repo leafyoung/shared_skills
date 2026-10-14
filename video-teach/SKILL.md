@@ -13,6 +13,7 @@ description: >-
   (pedagogy, workspace layout, lessons into the book, resources, verification
   gates), the `teach-marimo` skill (companion notebooks), the `mdbook-authoring`
   skill (book mechanics), and the `transcribe-video` skill (transcription).
+version: 1.1.0
 ---
 
 # Build a video course workspace
@@ -40,7 +41,11 @@ raw video timeline, authoring inputs the slides index + corrected transcript,
 root extras `MEDIA.md` (pointer to the gitignored video cache) and the kept
 transcript intermediates. Companion notebooks follow the **teach-marimo**
 skill's when-to-build rule (built by default for these courses; skipped when
-the lecture series teaches a non-Python language). The pipeline per episode:
+the lecture series teaches a non-Python language — for those, the unit carries
+`examples/` programs in the subject language per the **teach** skill's
+non-Python examples rule: every program compiled and executed, build command
+and observed output recorded in the examples README, each linked from the
+lesson it demonstrates). The pipeline per episode:
 
 ```
 video/URL ──transcribe-video──► transcript/<slug>.raw.vtt + .clean.md   (Step 1;
@@ -59,8 +64,15 @@ video/URL ──transcribe-video──► transcript/<slug>.raw.vtt + .clean.md 
 ```
 
 The video content itself is **ground truth**: never teach from parametric memory
-when a transcript or slide says otherwise. Web-search only for things the video
-implies but doesn't state (links, paper citations, published course materials).
+when a transcript or slide says otherwise. Search is stage-scoped. **Phase A
+(restoration)**: search to recover what the material itself contains — a term
+ASR garbled, a name the slides never spell out, a citation the lecturer
+mumbles — at best effort, never to add outside knowledge or contradict the
+source; anything search cannot attest stays `[as heard]`. **Phase B
+(authoring)**: teach's stricter rule applies — the moment you are even
+slightly unsure of any fact, name, date, formula, or definition, stop and
+verify, and notify the user when search fails rather than silently falling
+back to memory.
 
 **The transcript is the narration layer here** - a first-class input per
 teach's authoritative-index contract, not a byproduct of Step 2: the
@@ -233,14 +245,19 @@ Full commands, artifact definitions, and the precedence rules:
 (slide index appended), the slide-tagged `transcript/<slug>.clean.srt`, and
 `correction_brief.md`/`corrections.json` for provenance.
 
-The correction pass may consult **other episodes' slide OCR** — proper nouns recur
-across a course (TA rosters, benchmark names, model names, paper names), and a term
-this episode's slides never spell out may be attested on an earlier or later
-episode's deck. Cite the attesting slide in `corrections.json`'s notes; leave
-anything still unattested as `[as heard]` rather than guessing. A
-verification-only pass (empty `replacements`) is a legitimate outcome — record
-what was checked and why in `notes`, because that field is the handover narrative
-Phase B reads first.
+The correction pass attests garbled terms through a fixed hierarchy: **this
+episode's slide OCR → other episodes' slide OCR → web search**. Proper nouns
+recur across a course (TA rosters, benchmark names, model names, paper names),
+and a term this episode's slides never spell out may be attested on an earlier
+or later episode's deck — cite the attesting slide in `corrections.json`'s
+notes. When the decks don't attest it, search the official materials (the
+course site, the speaker's publications or org page, the conference's posted
+deck) and cite the attesting URL the same way. Two boundaries hold at every
+tier: the material outranks the search — never replace a term the slide image
+clearly shows — and a term nothing attests stays `[as heard]` rather than
+guessing. A verification-only pass (empty `replacements`) is a legitimate
+outcome — record what was checked and why in `notes`, because that field is
+the handover narrative Phase B reads first.
 
 Two retrofit notes (full detail: `references/transcript-foundation.md`):
 when the raw layer is rebuilt from YouTube auto-captions while `.clean.md`
@@ -264,7 +281,8 @@ formally belong to Step 5. Cite the lecture by video timestamp + transcript
 section. Everything else - book structure, figures, copyright posture,
 wrap-up and the exit gate - is the teach skill's; companion notebooks are the
 teach-marimo skill's (built by default here; skipped for non-Python-language
-lecture series).
+lecture series, which instead get `examples/` per the teach skill's
+non-Python examples rule).
 Lesson language: the course's language; per-language mirror books only when
 the user explicitly requests a translated course.
 

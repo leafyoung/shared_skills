@@ -172,8 +172,7 @@ def create_index(papers: List[Dict], output_dir: Path):
     
     # Also create JSON catalog
     catalog_file = output_dir / "catalog.json"
-    with open(catalog_file, 'w', encoding='utf-8') as f:
-        json.dump(papers_sorted, f, indent=2, ensure_ascii=False)
+    catalog_file.write_text(json.dumps(papers_sorted, indent=2, ensure_ascii=False), encoding='utf-8')
     print(f"✓ Created catalog: {catalog_file}")
 
 

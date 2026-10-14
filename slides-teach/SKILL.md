@@ -15,6 +15,7 @@ description: >-
   (pedagogy, workspace layout, lessons, resources, verification gates),
   `teach-marimo` (companion notebooks), and `mdbook-authoring` (book
   mechanics); the sibling for lecture-video sources is `video-teach`.
+version: 1.1.0
 ---
 
 # Build a course workspace from slides or documents
@@ -45,10 +46,23 @@ mdbook lessons (teach skill)              unit/notebooks/*.py (marimo,
 ```
 
 The document itself is **ground truth**: never teach from parametric memory
-when the source says otherwise. Web-search only for things the source implies
-but doesn't state (citations, cited papers, published course materials). If
-the source has gaps — a deck that sketches what the lecture would have spoken
-— say so in the unit README and teach only what the source supports.
+when the source says otherwise. Search is stage-scoped. **Extraction/indexing
+(restoration)**: when the source is a scanned deck, photos, or an image-only
+PDF, its text layer is missing or garbage — OCR the page images and treat OCR
+output as ambiguous exactly like ASR output in video-teach, attesting garbled
+terms, names, and numbers through a fixed hierarchy: **this deck's other
+pages → other units' sources → official materials online** (course page,
+authors' publications, publishing org), citing the attesting page or URL in
+the `pages/README.md` row. The page image outranks the OCR text, and anything
+unattested is flagged in the row rather than guessed. **Authoring**:
+teach's stricter rule applies — the moment you are even slightly unsure of any
+fact, name, date, formula, or definition, stop and verify, and notify the user
+when search fails rather than silently falling back to memory. Search never
+adds outside knowledge to the document or contradicts it; for things the
+source implies but doesn't state (citations, cited papers, published course
+materials), follow them up during authoring. If the source has gaps — a deck
+that sketches what the lecture would have spoken — say so in the unit README
+and teach only what the source supports.
 
 **The text layer (and speaker notes) are the narration layer here** -
 first-class inputs per teach's authoritative-index contract, not a byproduct
@@ -56,9 +70,12 @@ of extraction: lessons take their structure, derivations, and emphasis from
 the document's own order and its notes, and the page text carries the precise
 wording of formulas and claims. Author from the text outward (teach's rule:
 end-to-end read before writing). This flavor's precedence tail: the image
-outranks the text layer on layout, figures, and rendered formulas; the text
-layer outranks the image on exact wording and numbers (OCR/selection is
-exact; visual reading is not).
+outranks the text layer on layout, figures, and rendered formulas. On exact
+wording and numbers it depends on the source: a born-digital PDF's text layer
+is exact and outranks the image; a scanned deck or photo has no usable text
+layer — OCR the images instead (see the search-scoping note above), and the
+precedence flips (the image outranks the OCR text, which is ambiguous exactly
+where it matters).
 
 ## Unit pipeline
 
@@ -134,7 +151,10 @@ source document itself enters `RESOURCES` marked *in-repo*, pointing at
 copyright posture, wrap-up and the exit gate - is the teach skill's;
 companion notebooks are the teach-marimo skill's (built by default here;
 skipped when the source teaches a non-Python language; the XLSX data-bundling
-rule is teach-marimo's).
+rule is teach-marimo's) - non-Python sources instead get `examples/` programs
+in the subject language per the **teach** skill's non-Python examples rule
+(every program compiled and executed, build command and observed output
+recorded in the examples README, each linked from the lesson it demonstrates).
 
 ## Conventions
 
@@ -142,8 +162,10 @@ rule is teach-marimo's).
   notes.md, and lesson citations — cite `pNNN`, never "slide 12-ish".
 - **Formulas are transcribed as text** in the index (teach's
   authoritative-index rule); this flavor's precedence tail: the page image
-  outranks the text layer on rendered formulas and layout, the text layer on
-  exact wording and numbers.
+  outranks the text layer on rendered formulas and layout; on exact wording
+  and numbers, a born-digital text layer outranks the image, while for
+  scanned/image sources the image outranks the OCR text (search-scoping note
+  above).
 - **Errata in the source** get teach-skill ERRATA tags at the point of use
   (teach "Mirrors, sync, and verification").
 - **New session in an existing course**: follow teach's resume order;

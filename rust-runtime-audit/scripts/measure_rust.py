@@ -23,6 +23,7 @@ Parallel with per-core taskset pinning; MT-flagged units deferred to serial unpi
 resumable CSV appends; idempotent annotation prefixes. Run in a container with the toolchain.
 """
 import argparse, csv, glob, os, queue, re, shutil, signal, subprocess, sys, threading, time
+from pathlib import Path
 from collections import Counter
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -227,13 +228,15 @@ def parallel_run(jobs, job, nwork):
 def replace_or_append(path, prefix, line):
     if not path:
         return
+    rp = Path(path).resolve()
+    if not rp.is_relative_to(Path(ROOT).resolve()):
+        sys.exit(f"error: path escapes audit root: {path}")
     text = read(path)
     if prefix in text:
         text = re.sub(rf"^[^\n]*{re.escape(prefix)}[^\n]*\n", line, text, count=1, flags=re.M)
     else:
         text = (text.rstrip("\n") + "\n\n" + line) if text.strip() else line
-    with open(path, "w", errors="surrogateescape") as f:
-        f.write(text)
+    rp.write_text(text, errors="surrogateescape")
 
 def split_mt(unit_list):
     st = [u for u in unit_list if not u[5]]
@@ -277,7 +280,10 @@ def phase_profiles(only=None):
     if only:
         log("only-mode: CSV not written"); return
     os.makedirs(REPORTS, exist_ok=True)
-    with open(os.path.join(REPORTS, "peak_memory.csv"), "w") as f:
+    csv_p = Path(REPORTS, "peak_memory.csv").resolve()
+    if not csv_p.is_relative_to(Path(ROOT).resolve()):
+        sys.exit(f"error: csv path escapes audit root: {csv_p}")
+    with csv_p.open("w") as f:
         f.write("bank,id,source,status,exit_code,threads_max,pinned,peak_rss_kb_debug,peak_rss_kb_release,"
                 "run_seconds,time_debug,time_release\n")
         for r in sorted(rows, key=lambda r: (r[0], r[1])):
@@ -299,7 +305,10 @@ def run_tool_mode(kind, only=None):
     unit_list = list(units(only))
     if kind == "tsan":
         probe = os.path.join(OUT, "probe.rs")
-        open(probe, "w").write("fn main() {}\n")
+        probe_p = Path(probe).resolve()
+        if not probe_p.is_relative_to(Path(OUT).resolve()):
+            sys.exit(f"error: probe path escapes scratch dir: {probe}")
+        probe_p.write_text("fn main() {}\n")
         pr = subprocess.run(["rustc", "-Zsanitizer=thread", "-o", probe + ".bin", probe],
                             capture_output=True, text=True)
         if pr.returncode != 0:
@@ -570,7 +579,10 @@ def phase_report(only=None):
     clean = sorted(set(r["id"] for r in ok) - set(flagged))
     L += ["## Clean units", "", f"{len(clean)} unit(s) with no findings.", ""]
     os.makedirs(REPORTS, exist_ok=True)
-    open(os.path.join(REPORTS, "IMPROVEMENT_REPORT.md"), "w").write("\n".join(L) + "\n")
+    rep_p = Path(REPORTS, "IMPROVEMENT_REPORT.md").resolve()
+    if not rep_p.is_relative_to(Path(ROOT).resolve()):
+        sys.exit(f"error: report path escapes audit root: {rep_p}")
+    rep_p.write_text("\n".join(L) + "\n")
     log(f"report: {len(flagged)} flagged of {len(ok)} OK units")
 
 if __name__ == "__main__":

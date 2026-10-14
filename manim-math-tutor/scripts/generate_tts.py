@@ -189,9 +189,10 @@ async def generate_all(csv_path, output_dir, voice='xiaoxiao'):
             'voice': voice
         }
 
-        info_path = os.path.join(output_dir, 'audio_info.json')
-        with open(info_path, 'w', encoding='utf-8') as f:
-            json.dump(info, f, ensure_ascii=False, indent=2)
+        info_path = Path(os.path.join(output_dir, 'audio_info.json')).expanduser().resolve()
+        if not (info_path.is_relative_to(Path.cwd().resolve()) or info_path.is_relative_to(Path.home().resolve())):
+            raise ValueError(f"output path escapes cwd and $HOME: {info_path}")
+        info_path.write_text(json.dumps(info, ensure_ascii=False, indent=2), encoding='utf-8')
 
         print(f"已生成: {info_path}")
 
