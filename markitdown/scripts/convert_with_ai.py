@@ -160,7 +160,7 @@ Examples:
   python convert_with_ai.py diagram.png diagram.md --model anthropic/claude-sonnet-4.5 --custom-prompt "Describe this technical diagram"
   
   # Set API key via environment variable
-  export OPENROUTER_API_KEY="sk-or-v1-..."
+  export OPENROUTER_API_KEY="<your-openrouter-key>"
   python convert_with_ai.py image.jpg image.md
 
 Environment Variables:
