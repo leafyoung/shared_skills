@@ -19,6 +19,16 @@ import re
 import json
 from pathlib import Path
 
+WORKDIR = Path.cwd().resolve()
+HOMEDIR = Path.home().resolve()
+
+
+def _confined(p):
+    rp = Path(p).expanduser().resolve()
+    if not (rp.is_relative_to(WORKDIR) or rp.is_relative_to(HOMEDIR)):
+        sys.exit(f"error: path escapes cwd and $HOME: {p}")
+    return rp
+
 
 def parse_storyboard(storyboard_path):
     """解析分镜脚本，提取音频清单部分"""
@@ -158,9 +168,8 @@ def generate_audio_info_json(updated_list, audio_dir):
         'count': len(updated_list)
     }
 
-    output_path = os.path.join(audio_dir, 'audio_info.json')
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
+    output_path = _confined(os.path.join(audio_dir, 'audio_info.json'))
+    output_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding='utf-8')
 
     print(f"\n已生成: {output_path}")
     return output_path
@@ -199,8 +208,7 @@ def update_storyboard(storyboard_path, original_content, updated_list):
 
         new_lines.append(line)
 
-    with open(storyboard_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(new_lines))
+    _confined(storyboard_path).write_text('\n'.join(new_lines), encoding='utf-8')
 
     print(f"已更新: {storyboard_path}")
 

@@ -23,6 +23,7 @@ same compilers + valgrind for all measurements; repo visible at identical path.
 Re-runs are idempotent: annotation lines are replaced by prefix, binaries stay in /tmp.
 """
 import argparse, csv, glob, os, queue, re, shutil, signal, subprocess, sys, threading, time
+from pathlib import Path
 from collections import Counter
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -195,13 +196,15 @@ def std_of(files, root):
     return "c++20" if any(re.search(r"jthread|concept |co_await|operator<=>|<=>", read(f)) for f in files) else "c++17"
 
 def replace_or_append(path, prefix, line):
+    rp = Path(path).resolve()
+    if not rp.is_relative_to(Path(ROOT).resolve()):
+        sys.exit(f"error: path escapes audit root: {path}")
     text = read(path)
     if prefix in text:
         text = re.sub(rf"^[^\n]*{re.escape(prefix)}[^\n]*\n", line, text, count=1, flags=re.M)
     else:
         text = (text.rstrip("\n") + "\n\n" + line) if text.strip() else line
-    with open(path, "w", errors="surrogateescape") as f:
-        f.write(text)
+    rp.write_text(text, errors="surrogateescape")
 
 def parallel_run(units_list, job, cpus):
     """Run job(unit, cpu_or_None) over units; single-cpu-pinned workers for non-MT, MT serial unpinned last."""
@@ -310,7 +313,10 @@ def phase_opts(only=None):
     if only:  # debug mode: don't clobber the full CSV
         log("only-mode: CSV not written"); return
     os.makedirs(os.path.dirname(CSV), exist_ok=True)
-    with open(CSV, "w") as f:
+    csv_p = Path(CSV).resolve()
+    if not csv_p.is_relative_to(Path(ROOT).resolve()):
+        sys.exit(f"error: csv path escapes audit root: {CSV}")
+    with csv_p.open("w") as f:
         f.write("bank,id,compile_dir,source,std,status,clang_status,exit_code,threads_max,pinned,"
                 "peak_rss_kb_gcc_O0,peak_rss_kb_gcc_O2,peak_rss_kb_gcc_O3,"
                 "peak_rss_kb_clang_O0,peak_rss_kb_clang_O2,peak_rss_kb_clang_O3,run_seconds,"
@@ -860,7 +866,10 @@ def phase_report(only=None):
     L += [f"{len(clean)} unit(s) with no findings: no sanitizer/memcheck/race flags, baseline RSS, "
           f"typical runtime.", ""]
     out = os.path.join(reports_dir, "IMPROVEMENT_REPORT.md")
-    open(out, "w").write("\n".join(L) + "\n")
+    out_p = Path(out).resolve()
+    if not out_p.is_relative_to(Path(ROOT).resolve()):
+        sys.exit(f"error: report path escapes audit root: {out}")
+    out_p.write_text("\n".join(L) + "\n")
     log(f"report: {len(flagged)} flagged of {len(ok)} OK units -> {os.path.relpath(out, ROOT)}")
 
 if __name__ == "__main__":
