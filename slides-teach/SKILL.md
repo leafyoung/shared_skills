@@ -49,11 +49,12 @@ The document itself is **ground truth**: never teach from parametric memory
 when the source says otherwise. Search is stage-scoped. **Extraction/indexing
 (restoration)**: when the source is a scanned deck, photos, or an image-only
 PDF, its text layer is missing or garbage — OCR the page images and treat OCR
-output as ambiguous exactly like ASR output in video-teach: search the
-official materials (course page, authors' publications, publishing org) to
-attest garbled terms, names, and numbers at best effort, citing the attesting
-source in the `pages/README.md` row; the page image outranks the OCR text,
-and anything unattested is flagged in the row rather than guessed. **Authoring**:
+output as ambiguous exactly like ASR output in video-teach, attesting garbled
+terms, names, and numbers through a fixed hierarchy: **this deck's other
+pages → other units' sources → official materials online** (course page,
+authors' publications, publishing org), citing the attesting page or URL in
+the `pages/README.md` row. The page image outranks the OCR text, and anything
+unattested is flagged in the row rather than guessed. **Authoring**:
 teach's stricter rule applies — the moment you are even slightly unsure of any
 fact, name, date, formula, or definition, stop and verify, and notify the user
 when search fails rather than silently falling back to memory. Search never
