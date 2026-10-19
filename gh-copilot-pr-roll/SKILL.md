@@ -1,7 +1,7 @@
 ---
 name: gh-copilot-pr-roll
 description: This skill should be used when the user asks to "roll Copilot review on a PR", "loop Copilot review until clean", "fix Copilot's PR comments and re-review", "iterate with Copilot code review", or gives a goal like "fix all open and previously missed issues on PR N, push, trigger Copilot review, repeat until no issues". Runs the fix → push → request Copilot review → wait → read findings cycle until Copilot reports nothing open. Replies only on GitHub Copilot's review; if Copilot is out of quota or does not run, it stops and reports (use pr-roll for a local subagent reviewer instead).
-version: 0.2.0
+version: 0.2.1
 ---
 
 # gh-copilot-pr-roll
@@ -9,7 +9,7 @@ version: 0.2.0
 Drive a GitHub PR to a clean Copilot review by repeating one cycle:
 **fix → commit/push → confirm commit on PR → request Copilot review → wait → read findings → fix.**
 Stop when the newest Copilot review has no Open and no "Previously missed" items.
-This skill works against GitHub Copilot only. If Copilot is unavailable (quota, rejected re-request, timeout), stop and tell the user; the `pr-roll` skill rolls the same PR with a local subagent reviewer.
+This skill works against GitHub Copilot only. If Copilot is unavailable (quota, rejected re-request, timeout), stop and tell the user; the `pr-roll` skill rolls the same PR with a local subagent reviewer. Hierarchy: `pr-roll` is the default for any "roll the PR" request — reach for this skill only when the user names Copilot or wants Copilot's review specifically driven to clean.
 
 Needs `gh` authenticated with access to the repo. Set `R=owner/repo`, `N=pr-number`.
 

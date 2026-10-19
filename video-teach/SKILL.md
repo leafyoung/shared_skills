@@ -337,3 +337,44 @@ catches mislabeled captures and garbled names that presence checks never will.
 - [ ] if a Phase A defect was found *during* Phase B: re-run every A-gate item the
       fix touches (renames → re-OCR → re-assemble index → re-tag SRT) before
       committing, so the committed set is consistent end to end
+
+**Phase B verification suite** (run per book after all episodes are authored; each
+gate is mechanical where a command can decide, independent-model where judgment is
+needed — never the author's own claim):
+
+- [ ] **Coverage matrix** — script (`<course>/tools/coverage_matrix.py` pattern:
+      parse each episode's `slides/README.md` for `slideK_` files, check every K is
+      cited in that episode's lessons, "slides 9-14" ranges inclusive). Fully green
+      means every slide is taught or recorded as skipped *with a reason* in the unit
+      overview ("## Slides not taught"). This gate catches what agents wave through:
+      intermediate board states, recap slides, never-narrated exercise pages.
+- [ ] **Independent per-episode quant review** — one fresh-context reviewer per
+      episode (never the drafter), recomputing every formula/number/exercise answer
+      against the slide index and VALIDATION.md; findings marked verified only with
+      a recomputation or verbatim slide quote; fixers apply verified findings only
+      and bridge cross-lesson notation seams (same symbol, different object — the
+      most common real defect class). Zero "unconfirmed" should be the norm.
+- [ ] **KaTeX render audit** — headless-chromium screenshots of the math-heaviest
+      pages plus a DOM-level audit (scrollWidth vs clientWidth for right-margin
+      truncation of display math; text scan for raw `$`/`$$`/`~`; `.katex-error`
+      counts). Vision-only reads false-positive on downscaled tall pages; the DOM
+      audit is ground truth. Fix overflows with `aligned`/`gathered` wraps.
+- [ ] **Prose proofread** — per-episode pass with content frozen (numbers,
+      citations, exercise/answer pairing): slop phrasing, unparseable sentences
+      (literal-translation calques in non-English courses), LaTeX lint (unescaped
+      currency `$`, `$$` spacing, `\tilde`), dead links, answer numbering.
+- [ ] **Notebook bar** — companion notebooks/scripts: formatted (air for R, ruff
+      check --fix + format for Python, config in the course `pyproject.toml`) AND
+      re-executed after any formatting or edit (marimo runner with assertions inside
+      cells that return declared definitions, so headless failures are detectable;
+      `Rscript` for R). A mismatch with the lecture is a finding to record, never
+      tuned away; lost data files mean auditing the printed console outputs, never
+      substituting synthetic data unlabelled.
+- [ ] **Close-out** — `about.md` progress table, per-course `VALIDATION_REPORT.md`
+      (gates run, findings, open issues), course AGENTS.md checklist updated.
+
+Operating lessons baked into the suite: concurrent wave pairs are safe up to the
+20-subagent cap except that each wave's SUMMARY-merging editor can race — check the
+merge (or have only one run own SUMMARY); lesson files are named by episode *slug*
+(m117-…), never the bare episode number; the built `book/` output may trip
+security scanners on its generated JS — commit with `book/` removed and rebuild.
