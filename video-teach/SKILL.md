@@ -13,7 +13,9 @@ description: >-
   (pedagogy, workspace layout, lessons into the book, resources, verification
   gates), the `teach-marimo` skill (companion notebooks), the `mdbook-authoring`
   skill (book mechanics), and the `transcribe-video` skill (transcription).
-version: 1.1.0
+version: 1.1.1
+
+**Time-synced requirement**: every stage of this pipeline consumes timing (raw.vtt, .srt, slide windows matched to the timeline), so the transcription must be time-synced. That is produced by `rust-transcribe` with its local whisper-cli (the `transcribe-video` default), or by any local ASR model with the same segment-timestamp capability. A non-time-synced local-LLM transcript (text-only output, no `.srt`) cannot substitute here.
 ---
 
 # Build a video course workspace
@@ -179,6 +181,14 @@ slide window, captured late in the window), a
    full-res frames). Drop non-slides: webcam cutaways, terminal demos, transition
    blurs. Lower `--scene-threshold` and re-run if slide changes were missed;
    extract a missed frame manually with `ffmpeg -ss <t> -i video -frames:v 1`.
+   **Token discipline:** this step is routinely the run's most expensive
+   (16–35M tokens observed) because vision reads accumulate in the agent's
+   context. Verify candidates against their OCR text first (slide_ocr output,
+   footer sweeps) and spend full-res Reads only where OCR is ambiguous,
+   garbled, or a row would otherwise be guesswork — cap full-res reads at
+   roughly 20 per episode and keep a list of which frames were read. Batch
+   sweep results to disk and read summaries rather than streaming per-frame
+   output into the conversation.
 2. Move keepers to `ep<N>_<slug>/slides/`, renamed `slideK_<slug>_<MmSSs>.png`
    (K = 1..count in first-appearance order; `MmSSs` = the capture timestamp).
 3. Write `slides/README.md` — the **authoritative index**, per teach's

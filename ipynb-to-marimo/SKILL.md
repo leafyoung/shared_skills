@@ -333,6 +333,24 @@ Details, edge cases, and the removal protocol: read
   `mo.ui.anywidget(...)` only for entries marked "no equivalent").
 - For LaTeX and MathJax, read [`references/latex.md`](references/latex.md).
 
+## 6b. Batch-conversion note
+
+When converting a whole folder batch under an automated gate (for example a
+batch-intake workflow):
+
+- `verify_structure.py` / `verify_chains.py` (Layers 1–2) FAIL split conversions
+  solely on their 1:1 cell-count pairing model (1 source cell vs 11–14 marimo
+  cells after section-banner splits). A 0 exit from those scripts is NOT expected
+  or required for such splits — `marimo check` + a full headless run are the
+  deciding gates. Don't burn fix rounds
+  trying to make the pairing scripts pass.
+- Always start from the free `marimo convert` draft (§1) rather than authoring
+  the marimo file from scratch — hand-authoring whole 500-line files is the
+  single largest token cost in batch runs.
+- If a plain-text cell dump of the source is provided (for example from a
+  cell-dump helper), read the dump instead of parsing the `.ipynb`
+  JSON — identical statements, a fraction of the input tokens, and read it once.
+
 ## 7. Clean up
 
 Only after all four layers pass: archive the originals somewhere ephemeral, delete

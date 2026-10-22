@@ -68,7 +68,7 @@ material. Fix the parameters at workspace creation:
 |---|---|---|---|
 | Unit folder | `epN_<slug>/` | `unitN_<slug>/` | none (flat) |
 | Join key | `MmSSs` timestamps | source page `pNNN` | - |
-| Authoring inputs | `slides/README.md` + corrected transcript | `pages/README.md` + text layer + `notes.md` | research |
+| Authoring inputs | `slides/README.md` + corrected transcript — in token-lean runs: the planner (which reads both end-to-end) emits each lesson a **source packet** (its slide rows + transcript-section excerpts), and lesson authors work from the packet + targeted extraction instead of whole-file reads | `pages/README.md` + text layer + `notes.md` | research |
 | Source gate | video-teach Phase A | slides-teach index review | - |
 | Extras | `MEDIA.md` + gitignored media cache; deck PDF pulled forward | `source/` committed; `notes.md` speaker notes | - |
 | Course shape | planned (front-end courses are always planned) | planned | planned or session-driven - chosen at first session, recorded in `NOTES` |
