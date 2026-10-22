@@ -22,6 +22,8 @@ distrobox/podman container that has the toolchain; the repo is visible at the sa
 (distrobox shares $HOME). One consistent toolchain for all measurements:
 
 ```bash
+# Bank layout: export CPP_AUDIT_BANKS=/path/to/banks.json (JSON describing the solution banks; the
+# script refuses to run without it - see bank_specs() in scripts/measure_peak_rss.py for the format).
 # one-time (<container> is a distrobox container with dnf):
 podman exec <container> dnf install -y valgrind gcc-c++ clang   # check: which valgrind clang++ g++
 # <container> is known-good: g++ 15.2.1, clang++ 20.1.8, valgrind 3.26, 32 cores
