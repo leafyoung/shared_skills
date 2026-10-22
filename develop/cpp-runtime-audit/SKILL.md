@@ -22,8 +22,9 @@ distrobox/podman container that has the toolchain; the repo is visible at the sa
 (distrobox shares $HOME). One consistent toolchain for all measurements:
 
 ```bash
-# Bank layout: export CPP_AUDIT_BANKS=/path/to/banks.json (JSON describing the solution banks; the
-# script refuses to run without it - see bank_specs() in scripts/measure_peak_rss.py for the format).
+# The tool audits every folder of .cpp files under the working folder it runs in. Results are
+# written to runtime_audit_report/ there; a rerun resumes (skips units already in peak_memory.csv),
+# and --redo re-measures everything.
 # one-time (<container> is a distrobox container with dnf):
 podman exec <container> dnf install -y valgrind gcc-c++ clang   # check: which valgrind clang++ g++
 # <container> is known-good: g++ 15.2.1, clang++ 20.1.8, valgrind 3.26, 32 cores
@@ -170,9 +171,10 @@ floor is noise.
 
 ## Adapting to a new tree
 
-Edit `discover()` (yields bank, unit id, compile dir, include root) and, if ids are per-file
-rather than per-dir, the group logic in `units()`. Keep: the run harness, MT deferral, per-worker
-unique paths, resumable CSV appends, idempotent annotation prefixes. Smoke-test with
+The tool needs no configuration: `discover()` walks the working folder for folders with `.cpp`
+files, and each folder is one unit. Change `discover()` (yields bank, unit id, compile dir, include
+root) only if the layout needs something other than that. Keep: the run harness, MT deferral,
+per-worker unique paths, resume from the CSV, idempotent annotation prefixes. Smoke-test with
 `--only` on 2-3 units (one trivial, one multi-file, one MT) before a full batch.
 
 ## Finding -> improvement mapping (what --report encodes)

@@ -22,7 +22,6 @@ Run INSIDE the build container (podman exec <container> python3 <script> ...):
 same compilers + valgrind for all measurements; repo visible at identical path.
 Re-runs are idempotent: annotation lines are replaced by prefix, binaries stay in /tmp.
 
-Bank layout: set CPP_AUDIT_BANKS to a JSON file describing the banks (see bank_specs()).
 Without it the script refuses to run, so no bank layout is hard-coded in this file.
 """
 import argparse, csv, glob, json, os, queue, re, shutil, signal, subprocess, sys, threading, time
@@ -75,73 +74,16 @@ def read(f):
     except OSError:
         return ""
 
-def bank_specs():
-    """Load the bank layout from the JSON file named by CPP_AUDIT_BANKS.
-
-    Format::
-
-        {"banks": [
-            {"name": "<label>", "dir": "<folder under the tree>",
-             "unit_regex": "<matched on the path relative to the tree>",
-             "unit_format": "UNIT-{g1:02d}",             # id of a directory-level unit
-             "file_regex": "<matched on each .cpp path>",
-             "file_format": "FILE-{g1:02d}",              # id of each file-level unit
-             "dir_glob": "fn*/solutions"}],              # one compile dir per match (root = itself)
-         "extra_units": [{"bank": "<label>", "id": "<id>", "dir": "<folder under the tree>"}]}
-
-    Groups are numbered from 1; numeric groups are ints, and ``{g1_last}`` is the last digit of group 1.
-
-    Returns:
-        A tuple (banks, extra_units); both empty when CPP_AUDIT_BANKS is unset.
-    """
-    path = os.environ.get("CPP_AUDIT_BANKS")
-    if not path:
-        return [], []
-    with open(path, encoding="utf-8") as f:
-        cfg = json.load(f)
-    return cfg.get("banks", []), cfg.get("extra_units", [])
-
-def format_id(template, match):
-    """Build a unit id from a regex match and a format string.
-
-    Args:
-        template: Format string using {g1}, {g2}, ... and {g1_last}.
-        match: The regex match whose groups supply the values.
-
-    Returns:
-        The formatted id.
-    """
-    groups = {}
-    for i, v in enumerate(match.groups(), start=1):
-        groups[f"g{i}"] = int(v) if v is not None and v.isdigit() else v
-    if "g1" in groups and groups["g1"] is not None:
-        groups["g1_last"] = str(groups["g1"])[-1]
-    return template.format(**groups)
-
 def discover():
-    """Yield (bank, unit_id_or_None, compile_dir, include_root, spec) for every configured bank."""
-    banks, _ = bank_specs()
-    for spec in banks:
-        name, base = spec["name"], os.path.join(ROOT, spec["dir"])
-        if spec.get("dir_glob"):
-            for d in sorted(glob.glob(os.path.join(base, spec["dir_glob"]))):
-                yield name, None, d, d, spec
-            continue
-        dirs = set(glob.glob(os.path.join(base, "**", "*_solution*"), recursive=True))
-        dirs |= set(glob.glob(os.path.join(base, "**", "cpp"), recursive=True))
-        for d in sorted(x for x in dirs if os.path.isdir(x)):
-            uid = None
-            if spec.get("unit_regex"):
-                m = re.search(spec["unit_regex"], os.path.relpath(d, ROOT))
-                uid = format_id(spec["unit_format"], m) if m else None
-            yield name, uid, d, os.path.dirname(d), spec
+    """Yield (bank, unit_id, compile_dir, include_root, None) for every folder under ROOT that holds .cpp files.
 
-def file_id(cpp, spec):
-    """Id of a file-level unit, from the bank's file_regex; None when the bank has no file ids."""
-    if not spec.get("file_regex"):
-        return None
-    m = re.search(spec["file_regex"], cpp)
-    return format_id(spec["file_format"], m) if m else None
+    The unit id is the folder's path relative to the working tree. Report, cache and hidden folders are skipped.
+    """
+    skip = {"runtime_audit_report", "build", "__pycache__"}
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = sorted(x for x in dirnames if x not in skip and not x.startswith("."))
+        if any(f.endswith(".cpp") for f in filenames):
+            yield "work", os.path.relpath(dirpath, ROOT), dirpath, ROOT, None
 
 def build(cpps, root, std, out, extra=(), cxx="clang++", cwd=None, su_dir=None):
     inc = ["-I" + root] + (["-I" + os.path.join(root, "h")] if os.path.isdir(os.path.join(root, "h")) else [])
@@ -194,14 +136,11 @@ def run_peak(argv, datadirs, tmo, pin_cpu=None, env=None):
 
 def units(only=None):
     """Yield (bank, uid, d, root, std, srcs, main_src_or_None, mt, err) with build grouping resolved."""
-    for bank, uid, d, root, spec in discover():
+    for bank, uid, d, root, _ in discover():
         cpps = sorted(glob.glob(os.path.join(d, "*.cpp")))
         if not cpps:
             continue
-        per_file = bool(spec.get("file_regex"))
-        if per_file:
-            groups = [(file_id(c, spec), [c]) for c in cpps]
-        elif len(cpps) == 1:
+        if len(cpps) == 1:
             groups = [(uid, cpps)]
         else:
             ok, err = build(cpps, root, std_of(cpps, root), os.path.join(OUT, "probe"), (), "g++")
@@ -216,8 +155,6 @@ def units(only=None):
         for u, srcs in groups:
             if only and u not in only:
                 continue
-            if uid is None and not per_file:
-                log(f"NO_ID {d}"); continue
             all_src = srcs + sorted(glob.glob(os.path.join(d, "*.h"))) + \
                 sorted(glob.glob(os.path.join(root, "h", "*.h")))
             std = std_of(all_src, root)
@@ -317,10 +254,33 @@ def measure_all(srcs, root, std, d, uid, pin_cpu):
         "BUILD_FAIL" if len(res[cxx]) < len(OPTS) else "RUN_FAIL")
     return res, times, status_of(CXXS[0]), status_of(CXXS[1]), exit_code, secs, threads, stack_max, stack_sum
 
+CSV_COLUMNS = ["bank", "id", "compile_dir", "source", "std", "status", "clang_status", "exit_code",
+               "threads_max", "pinned", "peak_rss_kb_gcc_O0", "peak_rss_kb_gcc_O2", "peak_rss_kb_gcc_O3",
+               "peak_rss_kb_clang_O0", "peak_rss_kb_clang_O2", "peak_rss_kb_clang_O3", "run_seconds",
+               "stack_max_bytes", "stack_sum_bytes", "time_o0_clang", "time_o2_clang", "time_o3_clang"]
+
+def previous_rows():
+    """Rows of an earlier run in peak_memory.csv, keyed by unit id; empty when there is none."""
+    if not os.path.exists(CSV):
+        return {}
+    with open(CSV, newline="", encoding="utf-8") as f:
+        return {r["id"]: r for r in csv.DictReader(f)}
+
+REDO = False  # set from --redo in main()
+
 def phase_opts(only=None):
-    """Peak RSS + time at -O0/-O2/-O3 (clang++ + g++) -> peak_memory.csv + peak-rss annotation."""
+    """Peak RSS + time at -O0/-O2/-O3 (clang++ + g++) -> peak_memory.csv + peak-rss annotation.
+
+    Resumes: units already recorded in peak_memory.csv are skipped unless --redo is given.
+    """
     rows = []
+    prev = previous_rows()
     unit_list = list(units(only))
+    if not REDO and not only:
+        done = [u for u in unit_list if u[1] in prev]
+        unit_list = [u for u in unit_list if u[1] not in prev]
+        if done:
+            log(f"resume: {len(done)} unit(s) already in peak_memory.csv (use --redo to re-measure)")
     log(f"units: {len(unit_list)} (workers: {NWORK}, MT deferred: {sum(1 for u in unit_list if u[7])})")
 
     def job(u, cpu):
@@ -348,29 +308,29 @@ def phase_opts(only=None):
         if r[9] == "yes" and isinstance(r[8], int) and r[8] > 1 and r[1] in umap:
             log(f"runtime-MT {r[1]} (threads={r[8]}): re-running unpinned")
             rows[i] = job(umap[r[1]], None)
-    for extra in bank_specs()[1]:  # prose-only units with no source: listed so the report shows them
-        xdir = os.path.join(ROOT, extra["dir"])
-        if (not any(r[1] == extra["id"] for r in rows)) and os.path.isdir(xdir):
-            rows.append((extra["bank"], extra["id"], xdir,
-                         None, "n/a", "NO_SOURCE", "", "", 0, "n/a", "", "", "", "", "", "", "", 0, 0, "", "", ""))
     if only:  # debug mode: don't clobber the full CSV
         log("only-mode: CSV not written"); return
+    new = []
+    for r in rows:
+        new.append(dict(zip(CSV_COLUMNS, [
+            r[0], r[1], os.path.relpath(r[2], ROOT), os.path.relpath(r[3], ROOT) if r[3] else "",
+            r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16],
+            r[17], r[18], r[19], r[20], r[21]])))
+    new_ids = {r["id"] for r in new}
+    kept = [r for uid, r in prev.items() if uid not in new_ids and os.path.isdir(os.path.join(ROOT, r["compile_dir"]))]
+    all_rows = sorted(kept + new, key=lambda r: (r["bank"], r["id"] or ""))
     os.makedirs(os.path.dirname(CSV), exist_ok=True)
     csv_p = Path(CSV).resolve()
     if not csv_p.is_relative_to(Path(ROOT).resolve()):
         sys.exit(f"error: csv path escapes audit root: {CSV}")
-    with csv_p.open("w") as f:
-        f.write("bank,id,compile_dir,source,std,status,clang_status,exit_code,threads_max,pinned,"
-                "peak_rss_kb_gcc_O0,peak_rss_kb_gcc_O2,peak_rss_kb_gcc_O3,"
-                "peak_rss_kb_clang_O0,peak_rss_kb_clang_O2,peak_rss_kb_clang_O3,run_seconds,"
-                "stack_max_bytes,stack_sum_bytes,time_o0_clang,time_o2_clang,time_o3_clang\n")
-        for r in sorted(rows, key=lambda r: (r[0], r[1] or "")):
-            f.write(f'{r[0]},{r[1]},"{os.path.relpath(r[2], ROOT)}","{os.path.relpath(r[3], ROOT) if r[3] else ""}",'
-                    f'{r[4]},{r[5]},{r[6]},{r[7] or ""},{r[8]},{r[9]},'
-                    f'{r[10] or ""},{r[11] or ""},{r[12] or ""},{r[13] or ""},{r[14] or ""},{r[15] or ""},{r[16]},'
-                    f'{r[17]},{r[18]},{r[19] or ""},{r[20] or ""},{r[21] or ""}\n')
-    log(f"\nrows: {len(rows)}  g++ statuses: {dict(Counter(r[5] for r in rows))}  "
-        f"clang statuses: {dict(Counter(r[6] for r in rows))}")
+    with csv_p.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+        w.writeheader()
+        for r in all_rows:
+            w.writerow({k: ("" if v is None else v) for k, v in r.items()})
+    log(f"\nrows: {len(all_rows)} ({len(new)} measured now, {len(kept)} kept)  "
+        f"g++ statuses: {dict(Counter(r['status'] for r in all_rows))}  "
+        f"clang statuses: {dict(Counter(r['clang_status'] for r in all_rows))}")
     log(f"CSV: {os.path.relpath(CSV, ROOT)}")
 
 def parse_massif(path):
@@ -924,9 +884,9 @@ if __name__ == "__main__":
     ap.add_argument("--tsan", action="store_true", help="ThreadSanitizer mode (MT units only)")
     ap.add_argument("--report", action="store_true", help="synthesize CSVs into IMPROVEMENT_REPORT.md")
     ap.add_argument("--only", help="comma-separated unit ids (debug)")
+    ap.add_argument("--redo", action="store_true", help="re-measure units already in peak_memory.csv")
     a = ap.parse_args()
-    if not bank_specs()[0]:
-        sys.exit("no bank layout: set CPP_AUDIT_BANKS to a JSON file (see bank_specs() for the format)")
+    REDO = a.redo
     only = set(a.only.split(",")) if a.only else None
     shutil.rmtree(OUT, ignore_errors=True); os.makedirs(OUT)
     mode = phase_report if a.report else phase_tsan if a.tsan else phase_san if a.san else \
