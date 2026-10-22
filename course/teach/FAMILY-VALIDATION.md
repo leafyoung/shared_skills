@@ -9,13 +9,13 @@ mechanical checks that prove the current files still implement it.
 
 | Skill | Real files (git repo) | Owns |
 |---|---|---|
-| `teach` | `~/.agents/shared_skills/teach/` | pedagogy AND the workspace: layout, state docs, output formats, lessons into the book, resources, assets, mirrors/errata, verification bar, exit gates |
-| `teach-marimo` | `~/.agents/shared_skills/teach-marimo/` | companion notebooks: whether to build, how, the `run_marimo_notebook.py` verifier, editor wiring |
-| `video-teach` | `~/.agents/shared_skills/video-teach/` | video source pipeline: transcribe (Step 1), slides+OCR (Step 2), transcript layers (Step 3), Phase A handover gate |
-| `slides-teach` | `~/.agents/shared_skills/slides-teach/` | static-source pipeline: ingest (Step 1), page extraction/index + speaker notes (Step 2) |
-| `mdbook-authoring` | `~/.agents/shared_skills/mdbook-authoring/` | book mechanics: toolchain, Route A/B, style table (tracked in this repo like the family, but external to it: owned by its own skill, not restructured with it) |
+| `teach` | `~/.agents/shared_skills/course/teach/` | pedagogy AND the workspace: layout, state docs, output formats, lessons into the book, resources, assets, mirrors/errata, verification bar, exit gates |
+| `teach-marimo` | `~/.agents/shared_skills/course/teach-marimo/` | companion notebooks: whether to build, how, the `run_marimo_notebook.py` verifier, editor wiring |
+| `video-teach` | `~/.agents/shared_skills/course/video-teach/` | video source pipeline: transcribe (Step 1), slides+OCR (Step 2), transcript layers (Step 3), Phase A handover gate |
+| `slides-teach` | `~/.agents/shared_skills/course/slides-teach/` | static-source pipeline: ingest (Step 1), page extraction/index + speaker notes (Step 2) |
+| `mdbook-authoring` | `~/.agents/shared_skills/course/mdbook-authoring/` | book mechanics: toolchain, Route A/B, style table (tracked in this repo like the family, but external to it: owned by its own skill, not restructured with it) |
 
-`~/.agents/skills/<skill>` are symlinks to `../shared_skills/<skill>`; edit only
+`~/.agents/skills/<skill>` are symlinks to `../shared_skills/<group>/<skill>`; edit only
 the real files under `shared_skills/`.
 
 ## The architecture contract
@@ -60,7 +60,7 @@ pointers, never copies.
    internal markdown anchor resolves against its file's headings; frontmatter
    (`name:` + `description:`) parses in all four skills.
 5. **Symlinks** - `~/.agents/skills/` contains `teach`, `teach-marimo`,
-   `video-teach`, `slides-teach`, each resolving to `../shared_skills/<skill>`;
+   `video-teach`, `slides-teach`, each resolving to `../shared_skills/<group>/<skill>`;
    no `teach-course` symlink remains.
 6. **Regression spot-checks** - owned rules still present and attributed
    correctly: exercises-all-answered + multiple-choice construction (teach);
