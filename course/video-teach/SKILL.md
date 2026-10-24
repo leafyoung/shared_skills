@@ -13,9 +13,9 @@ description: >-
   (pedagogy, workspace layout, lessons into the book, resources, verification
   gates), the `teach-marimo` skill (companion notebooks), the `mdbook-authoring`
   skill (book mechanics), and the `transcribe-video` skill (transcription).
-version: 1.2.0
+version: 1.3.0
 
-**Time-synced requirement**: every stage of this pipeline consumes timing (raw.vtt, .srt, slide windows matched to the timeline), so the transcription must be time-synced. That is produced by `rust-transcribe` with its local whisper-cli (the `transcribe-video` default), or by any local ASR model with the same segment-timestamp capability. A non-time-synced local-LLM transcript (text-only output, no `.srt`) cannot substitute here.
+**Time-synced requirement**: every stage of this pipeline consumes timing (raw.vtt, .srt, slide windows matched to the timeline), so the transcription must be time-synced — segment timestamps are the one hard input requirement. The `transcribe-video` skill provisions this from whatever local ASR stack it is configured with (a local ASR job service or whisper.cpp; see that skill's Step 1 route selection — on setups with an ASR service, request its timestamped/SRT mode). Any source meeting the segment-timestamp requirement works; a non-time-synced text-only transcript cannot substitute here.
 ---
 
 # Build a video course workspace
