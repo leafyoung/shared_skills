@@ -13,7 +13,7 @@ description: >-
   (pedagogy, workspace layout, lessons into the book, resources, verification
   gates), the `teach-marimo` skill (companion notebooks), the `mdbook-authoring`
   skill (book mechanics), and the `transcribe-video` skill (transcription).
-version: 1.1.1
+version: 1.2.0
 
 **Time-synced requirement**: every stage of this pipeline consumes timing (raw.vtt, .srt, slide windows matched to the timeline), so the transcription must be time-synced. That is produced by `rust-transcribe` with its local whisper-cli (the `transcribe-video` default), or by any local ASR model with the same segment-timestamp capability. A non-time-synced local-LLM transcript (text-only output, no `.srt`) cannot substitute here.
 ---
@@ -292,7 +292,11 @@ section. Everything else - book structure, figures, copyright posture,
 wrap-up and the exit gate - is the teach skill's; companion notebooks are the
 teach-marimo skill's (built by default here; skipped for non-Python-language
 lecture series, which instead get `examples/` per the teach skill's
-non-Python examples rule).
+non-Python examples rule). At wrap time, run the teach skill's
+**buildable-but-unbuilt sweep**: any planned-but-absent notebook, example,
+reproduction run, or link/asset fix goes into the unit README's open gaps
+under an explicit "buildable" heading - distinct from needs-user and
+open-by-design - so the user is reminded what one more run could build.
 Lesson language: the course's language; per-language mirror books only when
 the user explicitly requests a translated course.
 

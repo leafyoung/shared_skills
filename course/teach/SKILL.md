@@ -15,7 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
-version: 1.1.0
+version: 1.2.0
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -400,6 +400,7 @@ A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): eve
 - [ ] a verification pass that did not write the lessons re-derived every exercise answer against its source; Answers are numbered 1:1 with Exercises and no authoring notes remain in shipped text
 - [ ] model answers containing runnable code were executed once (recorded), or are labeled unverified sketch
 - [ ] glossary cross-references point at the lesson that actually establishes each term- [ ] resources: every ledger entry added this session has a local path or a streaming-only note
+- [ ] **buildable-but-unbuilt sweep**: every companion artifact the plan put in scope is either on disk or listed in the unit README's open gaps under an explicit "buildable" heading - a planned marimo notebook per teach-marimo's when-to-build rule that no one wrote, planned `<unit>/examples/` programs, a reproduction run for quoted numbers where a dataset exists, residual link/asset defects. These are items a follow-up run CAN close; keep them separate from needs-user (human-only) and open-by-design (deliberate) gaps so the user sees at a glance what one more session could build
 - [ ] unit README current (including open gaps); commit(s) for the unit
 
 Source pipelines add their own gates before this one (video-teach's Phase A handover gate runs when the unit's data phase completes; the pipeline's own checklist defines each upstream step's end state).
