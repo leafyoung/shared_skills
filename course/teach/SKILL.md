@@ -15,7 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
-version: 1.2.0
+version: 1.3.0
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -261,6 +261,20 @@ Structure each concept in a lesson as a **node** in the dependency map, and teac
 
 The four moves must be discernible in the text; headings may be content-labeled rather than the literal four names.
 
+**Illustrate the load-bearing idea.** A lesson's central concept gets one
+illustration whenever a picture shows what prose can't: a structure or
+relationship (dependency, flow, sequence, state machine, comparison) or
+spatial/quantitative content (geometry, a curve's shape, a distribution, a
+ladder of stakes). Place it at the exact point the concept is taught, introduce
+it in one sentence, and caption it in one italic line stating the takeaway. One
+idea per figure, fewest carrying elements — every extra label makes the figure
+harder to read *and* harder to lay out correctly; if the element brief exceeds
+~7 items, cut it first. A decorative diagram that restates the neighboring
+sentence is noise plus one more chance to be wrong — when in doubt, don't.
+(2026-10-24: a finished 9-lesson course shipped prose-only; an illustration
+pass added one figure per lesson and each figure became the lesson's anchor
+image — the bar should have applied at authoring time.)
+
 Math renders as LaTeX — write `$f(x) = x^2$`, never plain-text approximations. If LaTeX can be used, it should be. (Rendering mechanics and per-format gotchas: mdbook-authoring.) Figures are regenerable components, not one-offs — see [Assets](#assets).
 
 ## Lessons in the book
@@ -374,7 +388,18 @@ Reuse is the default, not the exception. Before authoring a lesson, read `./asse
 
 Bootstrap shared helpers once per workspace rather than re-typing them: the mdbook-authoring skill's bundled `assets/book.toml` (callouts, KaTeX, text-fix preprocessor pre-wired), this skill's bundled [`assets/_quarto.yml`](./assets/_quarto.yml) for print-first Quarto workspaces, and [`assets/scripts/svgutil.py`](./assets/scripts/svgutil.py) for hand-built SVG figures (includes `FONT_EN`/`FONT_ZH` and `lang_from_argv()` for dual-language variants; copy it in once per workspace, and re-verify CJK font availability per workstation).
 
-Diagrams: use the `mermaid-maker` subagent for relational diagrams and `svg-maker` for spatial/geometric figures; embed the result (```` ```mermaid ```` block under mdBook, ```` ```{mermaid} ```` chunk in Quarto). If neither subagent is available, hand-build per the figure-script rule above.
+**Making figures — route by content, never embed unseen.** Nodes-and-edges /
+relationships → the `mermaid-maker` subagent, embedded as a ```` ```mermaid ````
+block (mdBook — wire `mdbook-mermaid` the moment the first block lands) or a
+```` ```{mermaid} ```` chunk (Quarto). Quantitative/geometric content → a
+charting script per the workspace stack (altair, matplotlib, …) or the
+`svg-maker` subagent. Hand-build only when neither maker is available
+(figure-script rule above). A figure counts as done only after its **rendered
+pixels have been looked at** and checked against the claim — unviewed figures
+ship broken (bars vanish on log scales, a layered chart silently drops its
+scale domain, labels collide, and mermaid renders client-side where a syntax
+error appears only in the browser). For mermaid, screenshot the built page in
+headless Chrome once; re-look at every PNG after each regeneration.
 
 ## Mirrors, sync, and verification
 
@@ -395,6 +420,7 @@ A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): eve
 
 - [ ] book: new chapters in `SUMMARY.md` (added in the same edit that creates them); `mdbook build` zero warnings; exercises all answered
 - [ ] lessons cite the source layers per the course's join key; every figure or source image copied into `mdbook/src/assets/` is embedded by a lesson
+- [ ] illustration bar: every lesson authored this session carries a figure for its load-bearing concept (where a picture earns its place — not a decorative restatement), and every embedded figure was render-inspected before embedding
 - [ ] notebooks (where this course builds them - teach-marimo's when-to-build rule): the teach-marimo verifier exits 0; linked from the unit's book chapters
 - [ ] examples (non-Python courses - the examples rule in Skills): every program in `<unit>/examples/` was compiled and executed, its observed output recorded in the examples README; each linked from the lesson it demonstrates
 - [ ] a verification pass that did not write the lessons re-derived every exercise answer against its source; Answers are numbered 1:1 with Exercises and no authoring notes remain in shipped text
