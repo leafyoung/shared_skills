@@ -15,7 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
-version: 1.4.0
+version: 1.4.1
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -398,7 +398,14 @@ matplotlib, …) or the `svg-maker` subagent. Diagrams (relationships) → the
 **`diagram-design` skill when it is installed in your session** — 45
 structural types with an editorial design system, a selection guide, and a
 complexity budget; the teaching-situation touch points for all 45 types live
-in [DIAGRAMS.md](./DIAGRAMS.md). Export PNG/SVG into
+in [DIAGRAMS.md](./DIAGRAMS.md). Sequence matters: author the course's
+illustrations **before** its first diagram — the chart scripts fix the
+course's figure palette, and diagram-design is then onboarded once per
+project with its paste-tokens option (d) sampled from those illustrations
+(paper, ink, accent, muted; darken the accent until text roles clear 4.5:1
+on paper), saved as a named profile plus a `.diagram-design` project marker.
+A course with no illustrations yet keeps the default editorial skin.
+Export PNG/SVG into
 `mdbook/src/assets/unitN/` and keep the HTML source (the figure's
 generation source) in `<unit>/assets/` per the regenerable-figure rule.
 Without it, fall back to the `mermaid-maker` subagent embedded as a

@@ -22,6 +22,17 @@ becomes a regenerable lesson asset.
 
 ## Routing
 
+0. **Onboard once per project — after the first illustrations exist.** The
+   chart scripts fix the course figure palette: sample paper (page
+   background), ink (primary text), accent (the charts' primary series
+   color), and muted (secondary) from the illustration constants or their
+   rendered PNGs, then onboard diagram-design with its paste-tokens option
+   (d): darken the accent until text roles clear 4.5:1 on paper, save it as
+   a named profile (`~/.diagram-design/profiles/<slug>.md`) and write the
+   project `.diagram-design` marker (mechanics: diagram-design's
+   `references/profiles.md`). No illustrations yet → skip onboarding and
+   keep the default editorial skin — never half-match a skin or edit the
+   installed skill's own `style-guide.md`.
 1. `diagram-design` skill installed in the session → invoke it for the diagram;
    follow its selection guide, complexity budget, and export scripts. In
    autonomous runs skip its confirm-before-drawing pause and note the
