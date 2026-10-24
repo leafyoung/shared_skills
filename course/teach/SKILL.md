@@ -15,7 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
-version: 1.3.0
+version: 1.4.0
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -158,7 +158,7 @@ The teaching rules are identical under both formats; only the authoring format a
 ## First session
 
 1. **Probe.** If no mission document exists yet, interview the user on why they want to learn this (`ask_user_question`) — interrogate the goal until it's concrete. Write it before authoring any teaching content (format: [MISSION-FORMAT.md](./MISSION-FORMAT.md); scaffold the directory shell first if the document lives inside the book). Also probe their current level: bracket the edge of what they know (see [Zone Of Proximal Development](#zone-of-proximal-development)). In the same question round, **confirm the output format** (see [Output Formats](#output-formats)) and **the course shape** (see [Course shape](#course-shape)) unless the user already specified them, and record the answers in `NOTES` before authoring content.
-2. **Plan.** Scope the field from research, never from memory alone. Present the plan in chat before any teaching: the approach in prose, plus a small mermaid dependency map — unconditional truths at the roots, each node hanging off what it depends on, the user's goal as the sink. Stress-test the roots: if a "foundational" node itself derives from something simpler the user would accept at face value, push it down. Then stop and wait for the user's go-ahead before authoring (resource *acquisition* may run during planning; authoring waits). Search for high-trust sources (books, articles, courses, communities) and populate `RESOURCES` — every entry is downloaded on the spot (see [Resources](#resources-download-on-the-spot)).
+2. **Plan.** Scope the field from research, never from memory alone. Present the plan in chat before any teaching: the approach in prose, plus a small mermaid dependency map — unconditional truths at the roots, each node hanging off what it depends on, the user's goal as the sink (in-chat this stays mermaid; keeper plan-page versions route through diagram-design when installed — [DIAGRAMS.md](./DIAGRAMS.md)). Stress-test the roots: if a "foundational" node itself derives from something simpler the user would accept at face value, push it down. Then stop and wait for the user's go-ahead before authoring (resource *acquisition* may run during planning; authoring waits). Search for high-trust sources (books, articles, courses, communities) and populate `RESOURCES` — every entry is downloaded on the spot (see [Resources](#resources-download-on-the-spot)).
 3. **Build one lesson.** mdbook (default): scaffold the book from the mdbook-authoring skill's bundled template and follow its Route A. Quarto (print-first only): create a single self-contained lesson in `./lessons/0001-...qmd` rendered to PDF via Typst, with the workspace `_quarto.yml` bootstrapped from the bundled template [`assets/_quarto.yml`](./assets/_quarto.yml).
 4. **Record.** Write a learning record if the user demonstrated understanding or disclosed prior knowledge.
 
@@ -261,19 +261,23 @@ Structure each concept in a lesson as a **node** in the dependency map, and teac
 
 The four moves must be discernible in the text; headings may be content-labeled rather than the literal four names.
 
-**Illustrate the load-bearing idea.** A lesson's central concept gets one
-illustration whenever a picture shows what prose can't: a structure or
-relationship (dependency, flow, sequence, state machine, comparison) or
-spatial/quantitative content (geometry, a curve's shape, a distribution, a
-ladder of stakes). Place it at the exact point the concept is taught, introduce
-it in one sentence, and caption it in one italic line stating the takeaway. One
-idea per figure, fewest carrying elements — every extra label makes the figure
-harder to read *and* harder to lay out correctly; if the element brief exceeds
-~7 items, cut it first. A decorative diagram that restates the neighboring
-sentence is noise plus one more chance to be wrong — when in doubt, don't.
-(2026-10-24: a finished 9-lesson course shipped prose-only; an illustration
-pass added one figure per lesson and each figure became the lesson's anchor
-image — the bar should have applied at authoring time.)
+**Illustrate the load-bearing idea.** A lesson's central concept gets a figure
+whenever a picture shows what prose can't. Two kinds, by what carries the
+meaning: an **illustration** when quantities or geometry carry it — a curve's
+shape, a distribution, a ladder of stakes, a level diagram (*evidence*, drawn
+from the lesson's own numbers); a **diagram** when relationships between
+discrete ideas carry it — what depends on what, what flows where, what
+contains what, what happens in what order, how a set of things is positioned
+against each other (*structure*, drawn schematically). Place it at the exact
+point the concept is taught, introduce it in one sentence, and caption it in
+one italic line stating the takeaway. One idea per figure, fewest carrying
+elements — every extra label makes the figure harder to read *and* harder to
+lay out correctly; if the element brief exceeds ~7 items, cut it first. A
+decorative figure that restates the neighboring sentence is noise plus one
+more chance to be wrong — when in doubt, don't. (2026-10-24: a finished
+9-lesson course shipped prose-only; an illustration pass added one figure per
+lesson and each figure became the lesson's anchor image — the bar should have
+applied at authoring time.)
 
 Math renders as LaTeX — write `$f(x) = x^2$`, never plain-text approximations. If LaTeX can be used, it should be. (Rendering mechanics and per-format gotchas: mdbook-authoring.) Figures are regenerable components, not one-offs — see [Assets](#assets).
 
@@ -388,18 +392,29 @@ Reuse is the default, not the exception. Before authoring a lesson, read `./asse
 
 Bootstrap shared helpers once per workspace rather than re-typing them: the mdbook-authoring skill's bundled `assets/book.toml` (callouts, KaTeX, text-fix preprocessor pre-wired), this skill's bundled [`assets/_quarto.yml`](./assets/_quarto.yml) for print-first Quarto workspaces, and [`assets/scripts/svgutil.py`](./assets/scripts/svgutil.py) for hand-built SVG figures (includes `FONT_EN`/`FONT_ZH` and `lang_from_argv()` for dual-language variants; copy it in once per workspace, and re-verify CJK font availability per workstation).
 
-**Making figures — route by content, never embed unseen.** Nodes-and-edges /
-relationships → the `mermaid-maker` subagent, embedded as a ```` ```mermaid ````
-block (mdBook — wire `mdbook-mermaid` the moment the first block lands) or a
-```` ```{mermaid} ```` chunk (Quarto). Quantitative/geometric content → a
-charting script per the workspace stack (altair, matplotlib, …) or the
-`svg-maker` subagent. Hand-build only when neither maker is available
-(figure-script rule above). A figure counts as done only after its **rendered
-pixels have been looked at** and checked against the claim — unviewed figures
-ship broken (bars vanish on log scales, a layered chart silently drops its
-scale domain, labels collide, and mermaid renders client-side where a syntax
-error appears only in the browser). For mermaid, screenshot the built page in
-headless Chrome once; re-look at every PNG after each regeneration.
+**Making figures — route by content, never embed unseen.** Illustrations
+(quantities/geometry) → a charting script per the workspace stack (altair,
+matplotlib, …) or the `svg-maker` subagent. Diagrams (relationships) → the
+**`diagram-design` skill when it is installed in your session** — 45
+structural types with an editorial design system, a selection guide, and a
+complexity budget; the teaching-situation touch points for all 45 types live
+in [DIAGRAMS.md](./DIAGRAMS.md). Export PNG/SVG into
+`mdbook/src/assets/unitN/` and keep the HTML source (the figure's
+generation source) in `<unit>/assets/` per the regenerable-figure rule.
+Without it, fall back to the `mermaid-maker` subagent embedded as a
+```` ```mermaid ```` block (mdBook — wire `mdbook-mermaid` the moment the
+first block lands) or a ```` ```{mermaid} ```` chunk (Quarto). Straddle zone
+(quadrants, Venn, pyramids, Sankey, treemaps, waterfalls, heatmaps, the
+line/scatter families exist in both worlds): if the figure must show the
+lesson's own exact numbers, it is an illustration (script, real data); if
+schematic values suffice and structure leads, it is a diagram. Hand-build
+only when no maker is available (figure-script rule above). A figure counts
+as done only after its **rendered pixels have been looked at** and checked
+against the claim — unviewed figures ship broken (bars vanish on log scales,
+a layered chart silently drops its scale domain, labels collide, and mermaid
+renders client-side where a syntax error appears only in the browser). For
+mermaid, screenshot the built page in headless Chrome once; re-look at every
+exported PNG after each regeneration.
 
 ## Mirrors, sync, and verification
 
@@ -420,7 +435,7 @@ A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): eve
 
 - [ ] book: new chapters in `SUMMARY.md` (added in the same edit that creates them); `mdbook build` zero warnings; exercises all answered
 - [ ] lessons cite the source layers per the course's join key; every figure or source image copied into `mdbook/src/assets/` is embedded by a lesson
-- [ ] illustration bar: every lesson authored this session carries a figure for its load-bearing concept (where a picture earns its place — not a decorative restatement), and every embedded figure was render-inspected before embedding
+- [ ] illustration bar: every lesson authored this session carries a figure for its load-bearing concept (where a picture earns its place — not a decorative restatement); relationship figures routed per the maker rule (diagram-design when installed, else mermaid), quantity/geometry figures script-generated; every embedded figure was render-inspected before embedding
 - [ ] notebooks (where this course builds them - teach-marimo's when-to-build rule): the teach-marimo verifier exits 0; linked from the unit's book chapters
 - [ ] examples (non-Python courses - the examples rule in Skills): every program in `<unit>/examples/` was compiled and executed, its observed output recorded in the examples README; each linked from the lesson it demonstrates
 - [ ] a verification pass that did not write the lessons re-derived every exercise answer against its source; Answers are numbered 1:1 with Exercises and no authoring notes remain in shipped text
