@@ -44,6 +44,10 @@ becomes a regenerable lesson asset.
    fast and throwaway. Reach for diagram-design when the figure becomes a
    keeper embedded in the book.
 
+Canvas sizing: use a 700–760px-wide viewBox (e.g. 720×460) with node names
+15px / sublabels 12px / arrow labels 10px — the book renders figures at
+~700px, so diagram-design's 960px doc-inline preset yields ~8.8px names,
+too small. Confirm by screenshotting the built page at render width.
 Embed mechanics: export PNG/SVG via the skill's export scripts into
 `mdbook/src/assets/unitN/` (embed from there per the Assets rule); keep the
 HTML source plus any brand profile in `<unit>/assets/` — the HTML is the

@@ -15,7 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
-version: 1.4.1
+version: 1.4.2
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -405,6 +405,13 @@ project with its paste-tokens option (d) sampled from those illustrations
 (paper, ink, accent, muted; darken the accent until text roles clear 4.5:1
 on paper), saved as a named profile plus a `.diagram-design` project marker.
 A course with no illustrations yet keeps the default editorial skin.
+**Size diagrams to the destination column.** The book draws figures at
+~700px wide: author them on a viewBox of ≈720–760px — not diagram-design's
+960px doc-inline preset, which shrinks node names to ~8.8px in the book —
+with the type ramp at node names 15px, sublabels 12px, arrow labels 10px
+(≈14.5 / 11.5 / 9.5px effective). Legibility is judged at render width:
+screenshot the built page, not the raw canvas (2026-10-25, measured across
+five embedded diagrams).
 Export PNG/SVG into
 `mdbook/src/assets/unitN/` and keep the HTML source (the figure's
 generation source) in `<unit>/assets/` per the regenerable-figure rule.
