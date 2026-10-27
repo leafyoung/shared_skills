@@ -15,7 +15,7 @@ description: >-
   the two teaching principles (see "How to Teach") so it locks in, without
   spinning up a workspace. Companion marimo notebooks are the teach-marimo
   skill's.
-version: 1.4.2
+version: 1.4.3
 ---
 
 The user has asked you to teach them something. If it grows into a
@@ -261,8 +261,18 @@ Structure each concept in a lesson as a **node** in the dependency map, and teac
 
 The four moves must be discernible in the text; headings may be content-labeled rather than the literal four names.
 
-**Illustrate the load-bearing idea.** A lesson's central concept gets a figure
-whenever a picture shows what prose can't. Two kinds, by what carries the
+**Illustrate the load-bearing ideas.** Every lesson carries **at least one
+figure for its load-bearing concept** (concepts, plural: a lesson with several
+load-bearing ideas may carry one figure per idea, each earning its place under
+the one-idea rule below). Prose-only is the rare, argued exception, not the
+default — a lesson with no figure needs a sentence in the author's head saying
+why no picture could beat the prose. **When the concept's inner structure or
+its relations carry teaching weight, add a relationship diagram as well**: its
+own parts, stages, or what-depends-on-what (inner structure), or how it
+connects to concepts other lessons established (the Connect move, made
+visible). The diagram is additional to the concept's figure, not a substitute
+— a quantity and the structure it sits in are two ideas and get two figures.
+Two kinds, by what carries the
 meaning: an **illustration** when quantities or geometry carry it — a curve's
 shape, a distribution, a ladder of stakes, a level diagram (*evidence*, drawn
 from the lesson's own numbers); a **diagram** when relationships between
@@ -277,7 +287,9 @@ decorative figure that restates the neighboring sentence is noise plus one
 more chance to be wrong — when in doubt, don't. (2026-10-24: a finished
 9-lesson course shipped prose-only; an illustration pass added one figure per
 lesson and each figure became the lesson's anchor image — the bar should have
-applied at authoring time.)
+applied at authoring time. 2026-10-25: bar strengthened to at-least-one figure
+per lesson, plus a relationship diagram wherever inner structure or
+cross-lesson relations carry weight.)
 
 Math renders as LaTeX — write `$f(x) = x^2$`, never plain-text approximations. If LaTeX can be used, it should be. (Rendering mechanics and per-format gotchas: mdbook-authoring.) Figures are regenerable components, not one-offs — see [Assets](#assets).
 
@@ -449,7 +461,7 @@ A translated course is full mirror books (`lessons_md/` + `lessons_md_zh/`): eve
 
 - [ ] book: new chapters in `SUMMARY.md` (added in the same edit that creates them); `mdbook build` zero warnings; exercises all answered
 - [ ] lessons cite the source layers per the course's join key; every figure or source image copied into `mdbook/src/assets/` is embedded by a lesson
-- [ ] illustration bar: every lesson authored this session carries a figure for its load-bearing concept (where a picture earns its place — not a decorative restatement); relationship figures routed per the maker rule (diagram-design when installed, else mermaid), quantity/geometry figures script-generated; every embedded figure was render-inspected before embedding
+- [ ] illustration bar: every lesson authored this session carries at least one figure for its load-bearing concept(s), and a relationship diagram wherever the concept's inner structure or its ties to other lessons' concepts carry teaching weight (no decorative restatements); relationship figures routed per the maker rule (diagram-design when installed, else mermaid), quantity/geometry figures script-generated; every embedded figure was render-inspected before embedding
 - [ ] notebooks (where this course builds them - teach-marimo's when-to-build rule): the teach-marimo verifier exits 0; linked from the unit's book chapters
 - [ ] examples (non-Python courses - the examples rule in Skills): every program in `<unit>/examples/` was compiled and executed, its observed output recorded in the examples README; each linked from the lesson it demonstrates
 - [ ] a verification pass that did not write the lessons re-derived every exercise answer against its source; Answers are numbered 1:1 with Exercises and no authoring notes remain in shipped text
